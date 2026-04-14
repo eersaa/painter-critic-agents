@@ -11,12 +11,12 @@
 When you are creating a plan, implementing or fixing issue always use following approach:
 
 1. Make sure that ALL fast tests pass. Ask user what to do if they fail.
-2. Write or edit tests for the described behavior in the current session plan.
-3. Review tests with **system-architect**
-4. Refactor, improve and simplify the tests based on the feedback.
-5. Ask user to review the acceptance tests
-6. Commit changes to tests.
-7. Implementation with red-green-refactor loop
+2. Main agent writes or edits acceptance tests for the described behavior in the current session plan.
+3. Main agent reviews tests with **reviewer** sub-agent.
+4. Main agent refactors, improves and simplifies the tests based on the feedback.
+5. Ask user to review the acceptance tests.
+6. Main agent commits changes to tests.
+7. Implementation with red-green-refactor loop (sub-agents commit their own changes):
    1. **test-writer** - red - writes or edits integration and unit level tests covering behavior of the acceptance tests.
    2. **implementer** - green - creates the implementation making the tests pass.
    3. **reviewer** - refactor - lints, refactors for quality.
