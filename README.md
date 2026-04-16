@@ -124,13 +124,20 @@ This decomposition allows each module to be tested independently without LLM cal
 
 ## Observations
 
-*This section will be updated after running the system.*
+Results from a 10-round run with prompt "a house with a sun and trees":
 
-<!-- TODO: Add observations after running 10 rounds -->
-<!-- - What went well in the drawing progression? -->
-<!-- - What went wrong or was unexpected? -->
-<!-- - How did the Critic's feedback influence the Painter? -->
-<!-- - Which tools were most/least used? -->
+**What worked well:**
+- The Critic's structured, numbered feedback (specific suggestions with coordinate guidance) effectively directed improvements. The Painter reliably translated feedback like "center the door" or "add a ground plane" into correct tool calls.
+- Iterative refinement was clearly visible: the scene progressed from basic shapes (round 1) to a recognizable house with roof overhang, centered door with doorknob, round tree canopies, window with glass reflection, and a green lawn (round 6).
+- The Painter batched 4-6 tool calls per turn, making substantial progress each round.
+
+**What went wrong:**
+- After round 6, the Critic ran out of substantive feedback and declared the scene "Excellent!" Both agents devolved into mutual congratulations for the remaining 4 rounds. Rounds 7-10 produced identical images — no further drawing occurred. A more directive Critic system message or a "never say the work is done" instruction could mitigate this.
+- `draw_line` was never used. The Painter relied on rectangles, circles, and polygons exclusively. Line-based details (fences, outlines, rays) were suggested by the Critic but the Painter chose other tools instead.
+
+**Model observations:**
+- `openai/gpt-4.1-mini` (Painter) showed solid spatial reasoning, correctly interpreting relative positioning feedback and mapping it to pixel coordinates on the 200x200 canvas.
+- `qwen/qwen3.5-flash-02-23` (Critic) provided detailed, well-structured visual feedback with clear priorities. Its vision capability accurately identified shape positioning issues (e.g., "the door looks like two separate rectangles").
 
 ## Running Tests
 
