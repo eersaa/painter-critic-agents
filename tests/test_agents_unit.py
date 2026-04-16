@@ -1,3 +1,4 @@
+import pytest
 from autogen import ConversableAgent
 
 from painter_critic.agents import create_agents
@@ -41,25 +42,14 @@ class TestAgentsUnit:
 
     # --- Painter system message mentions tool names ---
 
-    def test_agents_painter_system_message_mentions_draw_rectangle(self, api_url_env):
+    @pytest.mark.parametrize(
+        "tool_name",
+        ["draw_rectangle", "draw_circle", "draw_line", "draw_polygon"],
+    )
+    def test_agents_painter_system_message_mentions_tool(self, api_url_env, tool_name):
         painter, _ = create_agents("a tree")
 
-        assert "draw_rectangle" in painter.system_message
-
-    def test_agents_painter_system_message_mentions_draw_circle(self, api_url_env):
-        painter, _ = create_agents("a tree")
-
-        assert "draw_circle" in painter.system_message
-
-    def test_agents_painter_system_message_mentions_draw_line(self, api_url_env):
-        painter, _ = create_agents("a tree")
-
-        assert "draw_line" in painter.system_message
-
-    def test_agents_painter_system_message_mentions_draw_polygon(self, api_url_env):
-        painter, _ = create_agents("a tree")
-
-        assert "draw_polygon" in painter.system_message
+        assert tool_name in painter.system_message
 
     # --- Special characters in subject ---
 
