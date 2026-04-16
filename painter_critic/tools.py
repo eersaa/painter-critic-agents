@@ -19,7 +19,8 @@ def create_tools(canvas: Canvas) -> list[Callable]:
     max_x = width - 1
     max_y = height - 1
 
-    def draw_rectangle(x1, y1, x2, y2, color):
+    def draw_rectangle(x1: int, y1: int, x2: int, y2: int, color: str) -> str:
+        """Draw a filled rectangle from (x1,y1) to (x2,y2) with the given hex color."""
         if not _valid_color(color):
             return f"error: invalid color '{color}'"
         x1 = _clamp(int(x1), 0, max_x)
@@ -29,7 +30,8 @@ def create_tools(canvas: Canvas) -> list[Callable]:
         canvas.draw().rectangle([x1, y1, x2, y2], fill=color)
         return f"rectangle drawn at ({x1},{y1})-({x2},{y2}) with color {color}"
 
-    def draw_circle(cx, cy, radius, color):
+    def draw_circle(cx: int, cy: int, radius: int, color: str) -> str:
+        """Draw a filled circle at (cx,cy) with the given radius and hex color."""
         if not _valid_color(color):
             return f"error: invalid color '{color}'"
         cx = _clamp(int(cx), 0, max_x)
@@ -42,7 +44,10 @@ def create_tools(canvas: Canvas) -> list[Callable]:
         canvas.draw().ellipse([x1, y1, x2, y2], fill=color)
         return f"circle drawn at center ({cx},{cy}) radius {radius} with color {color}"
 
-    def draw_line(x1, y1, x2, y2, color, width=1):
+    def draw_line(
+        x1: int, y1: int, x2: int, y2: int, color: str, width: int = 1
+    ) -> str:
+        """Draw a line from (x1,y1) to (x2,y2) with the given hex color and width."""
         if not _valid_color(color):
             return f"error: invalid color '{color}'"
         x1 = _clamp(int(x1), 0, max_x)
@@ -55,11 +60,12 @@ def create_tools(canvas: Canvas) -> list[Callable]:
             f"line drawn from ({x1},{y1}) to ({x2},{y2}) with color {color} width {w}"
         )
 
-    def draw_polygon(points, color):
-        if not _valid_color(color):
-            return f"error: invalid color '{color}'"
+    def draw_polygon(points: list[tuple[int, int]], color: str) -> str:
+        """Draw a filled polygon from a list of (x,y) points with the given hex color."""
         if len(points) < 3:
             return f"error: polygon requires at least 3 points, got {len(points)}"
+        if not _valid_color(color):
+            return f"error: invalid color '{color}'"
         clamped = [
             (_clamp(int(x), 0, max_x), _clamp(int(y), 0, max_y)) for x, y in points
         ]
