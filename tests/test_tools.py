@@ -16,40 +16,41 @@ def tools(canvas):
 
 @pytest.fixture
 def draw_rectangle(tools):
-    return tools[0]
+    return tools["draw_rectangle"]
 
 
 @pytest.fixture
 def draw_circle(tools):
-    return tools[1]
+    return tools["draw_circle"]
 
 
 @pytest.fixture
 def draw_line(tools):
-    return tools[2]
+    return tools["draw_line"]
 
 
 @pytest.fixture
 def draw_polygon(tools):
-    return tools[3]
+    return tools["draw_polygon"]
 
 
 class TestToolsFactory:
-    def test_create_tools_returns_list_of_four(self, canvas):
+    def test_create_tools_returns_dict_with_four_keys(self, canvas):
         tools = create_tools(canvas)
 
-        assert isinstance(tools, list)
-        assert len(tools) == 4
+        assert isinstance(tools, dict)
+        assert set(tools.keys()) == {"draw_rectangle", "draw_circle", "draw_line", "draw_polygon"}
 
-    def test_create_tools_all_items_are_callable(self, canvas):
+    def test_create_tools_all_values_are_callable(self, canvas):
         tools = create_tools(canvas)
 
-        for tool in tools:
+        for tool in tools.values():
             assert callable(tool)
 
     def test_create_tools_share_same_canvas(self, canvas):
         tools = create_tools(canvas)
-        draw_rect, draw_circle, _, _ = tools
+        draw_rect = tools["draw_rectangle"]
+        draw_circle = tools["draw_circle"]
 
         draw_rect(10, 10, 20, 20, "#FF0000")
         draw_circle(50, 50, 5, "#0000FF")
