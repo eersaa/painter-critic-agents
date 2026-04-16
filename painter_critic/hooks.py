@@ -18,6 +18,16 @@ class RoundTracker:
         return f"{output_dir}/round_{self._round:02d}.png"
 
 
+def _is_tool_message(message: dict) -> bool:
+    return "tool_calls" in message or message.get("role") == "tool"
+
+
+def _append_image(content, image_block: dict) -> list:
+    if isinstance(content, list):
+        return list(content) + [image_block]
+    return [{"type": "text", "text": content}, image_block]
+
+
 def create_send_hook(canvas: Canvas) -> Callable:
     def hook(sender, message, recipient, silent):
         if isinstance(message, str):
@@ -29,20 +39,12 @@ def create_send_hook(canvas: Canvas) -> Callable:
             }
 
         if isinstance(message, dict):
-            if "tool_calls" in message or message.get("role") == "tool":
+            if _is_tool_message(message):
                 return message
-
             result = dict(message)
-            content = result["content"]
-
-            if isinstance(content, list):
-                result["content"] = list(content) + [canvas.to_image_content()]
-            else:
-                result["content"] = [
-                    {"type": "text", "text": content},
-                    canvas.to_image_content(),
-                ]
-
+            result["content"] = _append_image(
+                result["content"], canvas.to_image_content()
+            )
             return result
 
         return message
@@ -57,19 +59,13 @@ def create_reply_hook(canvas: Canvas) -> Callable:
 
         last = messages[-1]
 
-        if "tool_calls" in last or last.get("role") == "tool":
+        if _is_tool_message(last):
             return messages
 
         last_copy = dict(last)
-        content = last_copy["content"]
-
-        if isinstance(content, list):
-            last_copy["content"] = list(content) + [canvas.to_image_content()]
-        else:
-            last_copy["content"] = [
-                {"type": "text", "text": content},
-                canvas.to_image_content(),
-            ]
+        last_copy["content"] = _append_image(
+            last_copy["content"], canvas.to_image_content()
+        )
 
         return list(messages[:-1]) + [last_copy]
 

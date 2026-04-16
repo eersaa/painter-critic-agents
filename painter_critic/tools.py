@@ -51,14 +51,18 @@ def create_tools(canvas: Canvas) -> list[Callable]:
         y2 = _clamp(int(y2), 0, max_y)
         w = max(1, int(width)) if width is not None else 1
         canvas.draw().line([x1, y1, x2, y2], fill=color, width=w)
-        return f"line drawn from ({x1},{y1}) to ({x2},{y2}) with color {color} width {w}"
+        return (
+            f"line drawn from ({x1},{y1}) to ({x2},{y2}) with color {color} width {w}"
+        )
 
     def draw_polygon(points, color):
         if not _valid_color(color):
             return f"error: invalid color '{color}'"
         if len(points) < 3:
             return f"error: polygon requires at least 3 points, got {len(points)}"
-        clamped = [(_clamp(int(x), 0, max_x), _clamp(int(y), 0, max_y)) for x, y in points]
+        clamped = [
+            (_clamp(int(x), 0, max_x), _clamp(int(y), 0, max_y)) for x, y in points
+        ]
         canvas.draw().polygon(clamped, fill=color)
         return f"polygon drawn with {len(clamped)} points and color {color}"
 
