@@ -11,9 +11,12 @@
 
 ## Todo
 
+- [ ] Investigate `max_turns` vs `max_consecutive_auto_reply` — verify empirically whether tool call round-trips (Painter tool call → Critic executes → Painter summary) count as separate turns against `max_turns`. README and Wave 2 plan contradict each other. Affects how Wave 3 sets round count in `initiate_chat`.
+- [ ] Fix README: `src/painter_critic/` path should be `painter_critic/` (no src/ prefix)
+- [ ] Fix README: round control description says `max_consecutive_auto_reply` but decision is to use `max_turns`
 - [ ] Wave 3: Agents module — Painter + Critic ConversableAgents
 - [ ] Wave 4: Main module — CLI entrypoint, end-to-end integration
-- [ ] README.md
+- [ ] README.md observations section (fill in after running 10 rounds)
 
 ## Future Improvements
 
