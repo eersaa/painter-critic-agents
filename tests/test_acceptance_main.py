@@ -4,16 +4,7 @@ import pytest
 from autogen import ConversableAgent
 from PIL import Image
 
-from painter_critic.canvas import Canvas
-from painter_critic.config import CANVAS_SIZE
-from painter_critic.hooks import (
-    RoundTracker,
-    create_reply_hook,
-    create_save_hook,
-    create_send_hook,
-)
-from painter_critic.tools import create_tools
-from painter_critic.agents import create_agents
+from painter_critic.main import setup_pipeline
 
 
 def _make_painter_mock(tools):
@@ -41,7 +32,7 @@ def _critic_mock(recipient, messages=None, sender=None, config=None):
 
 
 def _run_mocked_pipeline(output_dir, rounds=3, painter_reply_factory=None):
-    """Wire all modules together with mocked LLM, run pipeline.
+    """Use real setup_pipeline wiring, inject mock LLM replies, run chat.
 
     Args:
         output_dir: Directory for output images.
@@ -50,20 +41,7 @@ def _run_mocked_pipeline(output_dir, rounds=3, painter_reply_factory=None):
 
     Returns (ChatResult, canvas, tools).
     """
-    canvas = Canvas(CANVAS_SIZE, CANVAS_SIZE)
-    tools = create_tools(canvas)
-    painter, critic = create_agents("test subject")
-
-    for func in tools.values():
-        painter.register_for_llm(description=func.__doc__)(func)
-        painter.register_for_execution()(func)
-
-    tracker = RoundTracker()
-    critic.register_hook("process_message_before_send", create_send_hook(canvas))
-    critic.register_hook("process_all_messages_before_reply", create_reply_hook(canvas))
-    painter.register_hook(
-        "process_message_before_send", create_save_hook(canvas, tracker, output_dir)
-    )
+    painter, critic, canvas, tools = setup_pipeline("test subject", output_dir)
 
     if painter_reply_factory:
         reply_func = painter_reply_factory(tools)

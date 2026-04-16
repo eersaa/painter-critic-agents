@@ -46,13 +46,13 @@ def save_conversation_log(chat_history: list[dict], output_dir: str) -> None:
     log_path.write_text("".join(lines))
 
 
-def run_pipeline(
+def setup_pipeline(
     prompt,
-    rounds=DEFAULT_ROUNDS,
     output_dir=OUTPUT_DIR,
     painter_model=DEFAULT_PAINTER_MODEL,
     critic_model=DEFAULT_CRITIC_MODEL,
 ):
+    """Create and wire all components. Returns (painter, critic, canvas, tools)."""
     canvas = Canvas(CANVAS_SIZE, CANVAS_SIZE)
     tools = create_tools(canvas)
     painter, critic = create_agents(prompt, painter_model, critic_model, CANVAS_SIZE)
@@ -68,6 +68,19 @@ def run_pipeline(
         "process_message_before_send", create_save_hook(canvas, tracker, output_dir)
     )
 
+    return painter, critic, canvas, tools
+
+
+def run_pipeline(
+    prompt,
+    rounds=DEFAULT_ROUNDS,
+    output_dir=OUTPUT_DIR,
+    painter_model=DEFAULT_PAINTER_MODEL,
+    critic_model=DEFAULT_CRITIC_MODEL,
+):
+    painter, critic, canvas, tools = setup_pipeline(
+        prompt, output_dir, painter_model, critic_model
+    )
     result = critic.initiate_chat(
         painter, message=f"Please draw: {prompt}", max_turns=rounds
     )
