@@ -24,7 +24,7 @@ class Canvas:
     def draw(self) -> ImageDraw.ImageDraw:
         return ImageDraw.Draw(self._image)
 
-    def save(self, path) -> None:
+    def save(self, path: str | Path) -> None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         self._image.save(str(path), format="PNG")
 

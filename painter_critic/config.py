@@ -1,10 +1,6 @@
 import argparse
 import os
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 CANVAS_SIZE = 200
 DEFAULT_ROUNDS = 10
 OUTPUT_DIR = "output"
