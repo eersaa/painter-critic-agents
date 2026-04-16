@@ -6,7 +6,7 @@ class TestToolsAcceptance:
     def test_tools_draw_rectangle_modifies_canvas_and_returns_string(self):
         canvas = Canvas()
         before = canvas.to_base64()
-        draw_rectangle, _, _, _ = create_tools(canvas)
+        draw_rectangle = create_tools(canvas)["draw_rectangle"]
 
         result = draw_rectangle(10, 10, 50, 50, "#FF0000")
 
@@ -16,7 +16,7 @@ class TestToolsAcceptance:
     def test_tools_draw_circle_modifies_canvas_and_returns_string(self):
         canvas = Canvas()
         before = canvas.to_base64()
-        _, draw_circle, _, _ = create_tools(canvas)
+        draw_circle = create_tools(canvas)["draw_circle"]
 
         result = draw_circle(100, 100, 20, "#00FF00")
 
@@ -26,7 +26,7 @@ class TestToolsAcceptance:
     def test_tools_draw_line_modifies_canvas_and_returns_string(self):
         canvas = Canvas()
         before = canvas.to_base64()
-        _, _, draw_line, _ = create_tools(canvas)
+        draw_line = create_tools(canvas)["draw_line"]
 
         result = draw_line(0, 150, 199, 150, "#0000FF")
 
@@ -36,7 +36,7 @@ class TestToolsAcceptance:
     def test_tools_draw_polygon_modifies_canvas_and_returns_string(self):
         canvas = Canvas()
         before = canvas.to_base64()
-        _, _, _, draw_polygon = create_tools(canvas)
+        draw_polygon = create_tools(canvas)["draw_polygon"]
 
         result = draw_polygon([(160, 10), (180, 40), (140, 40)], "#FFFF00")
 
