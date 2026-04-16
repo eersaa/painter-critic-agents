@@ -1,5 +1,4 @@
 import base64
-import pathlib
 
 import pytest
 from PIL import Image, ImageDraw
@@ -109,7 +108,6 @@ class TestCanvasUnit:
     def test_canvas_save_accepts_pathlib_path(self, tmp_path):
         canvas = Canvas()
         path = tmp_path / "pathlib_test.png"
-        assert isinstance(path, pathlib.Path)
 
         canvas.save(path)
 

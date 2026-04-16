@@ -21,7 +21,9 @@ def load_api_url() -> str:
 
 def create_llm_config(model: str) -> dict:
     api_url = load_api_url()
-    return {"config_list": [{"model": model, "base_url": api_url, "api_key": "not-needed"}]}
+    return {
+        "config_list": [{"model": model, "base_url": api_url, "api_key": "not-needed"}]
+    }
 
 
 def parse_args(argv=None) -> argparse.Namespace:
