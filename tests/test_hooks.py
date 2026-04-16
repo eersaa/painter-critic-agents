@@ -438,3 +438,16 @@ class TestSaveHookUnit:
         with open(saved, "rb") as f:
             header = f.read(8)
         assert header[:4] == b"\x89PNG"
+
+    # -- Guard: bare string message (AG2 send hooks receive str | dict) --
+
+    def test_save_hook_string_message_saves_file(self, tmp_output_dir):
+        canvas = Canvas()
+        tracker = RoundTracker()
+        hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
+
+        result = hook("painter", "done drawing", "critic", False)
+
+        assert (tmp_output_dir / "round_01.png").exists()
+        assert tracker.current_round == 2
+        assert result == "done drawing"

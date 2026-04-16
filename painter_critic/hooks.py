@@ -18,7 +18,9 @@ class RoundTracker:
         return f"{output_dir}/round_{self._round:02d}.png"
 
 
-def _is_tool_message(message: dict) -> bool:
+def _is_tool_message(message: dict | str) -> bool:
+    if isinstance(message, str):
+        return False
     return "tool_calls" in message or message.get("role") == "tool"
 
 
