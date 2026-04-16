@@ -1,6 +1,7 @@
 from autogen import ConversableAgent
 
 from painter_critic.agents import create_agents
+from painter_critic.config import CANVAS_SIZE
 
 
 class TestAgentsAcceptance:
@@ -30,8 +31,8 @@ class TestAgentsAcceptance:
     def test_painter_system_message_contains_coordinate_bounds(self, api_url_env):
         painter, _ = create_agents("a red circle")
 
-        # Painter must know the canvas coordinate range (0,0)-(199,199)
-        assert "199" in painter.system_message
+        # Painter must know the canvas coordinate range (0,0)-(max,max)
+        assert str(CANVAS_SIZE - 1) in painter.system_message
 
     def test_critic_system_message_contains_feedback_instructions(self, api_url_env):
         _, critic = create_agents("a red circle")
@@ -54,3 +55,13 @@ class TestAgentsAcceptance:
         _, critic = create_agents("a circle", critic_model="custom/critic")
 
         assert critic.llm_config["config_list"][0]["model"] == "custom/critic"
+
+    def test_painter_system_message_contains_image_instruction(self, api_url_env):
+        painter, _ = create_agents("a red circle")
+
+        assert "canvas image" in painter.system_message
+
+    def test_critic_system_message_contains_subject(self, api_url_env):
+        _, critic = create_agents("a blue triangle")
+
+        assert "a blue triangle" in critic.system_message
