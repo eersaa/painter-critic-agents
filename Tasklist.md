@@ -13,19 +13,19 @@
 - [x] Pre-Wave 4 Unit B: Wire canvas size, Painter image awareness, subject in Critic message
 - [x] Investigate `max_turns` — tool execution happens inside `generate_reply()`, does not consume extra turns. Wave 4 should use `max_turns`
 - [x] Confirm system prompts exist for both agents
+- [x] Fix README: path `src/painter_critic/` → `painter_critic/`, round control → `max_turns`
+- [x] Wave 4: Main module — `setup_pipeline`, `run_pipeline`, `save_conversation_log`, `main`, `__main__.py` (202 tests)
+- [x] Architect review Wave 4: extracted `setup_pipeline` to eliminate test wiring duplication
 
 ## Todo
 
-- [ ] Wave 4: Main module — CLI entrypoint, end-to-end integration
 - [ ] README.md observations section (fill in after running 10 rounds)
-- [ ] Fix README: `src/painter_critic/` path should be `painter_critic/` (no src/ prefix)
-- [ ] Fix README: round control description says `max_consecutive_auto_reply` but decision is to use `max_turns`
+- [ ] Run full 10-round pipeline with real API and verify output
 
 ## Future Improvements
 
-- Consider returning `dict[str, Callable]` from `create_tools` instead of list — fragile index-based unpacking; fix before Wave 4 adds another consumer
-- Consider moving `RoundTracker` out of `hooks.py` — it's not a hook, it manages round lifecycle state; could live in `config.py` or its own module
-- Consider removing `python-dotenv` from dependencies if main.py won't call `load_dotenv()`
-- Consider `Canvas.width`/`Canvas.height` properties if Tools code needs frequent dimension access
+- Consider moving `RoundTracker` out of `hooks.py` — it's not a hook, it manages round lifecycle state
+- Consider `Canvas.width`/`Canvas.height` properties if frequent dimension access needed
 - Consider `Canvas.clear()` if restart capability is needed
-- Unify canvas dimension source of truth: `Canvas()` defaults width/height independently from `config.CANVAS_SIZE`; Wave 4 `main.py` must pass size explicitly to both `Canvas()` and `create_agents()` to avoid mismatch
+- Unify canvas dimension source of truth: `Canvas()` defaults width/height independently from `config.CANVAS_SIZE`
+- Consider moving `save_conversation_log` to its own module if more output formatters are added
