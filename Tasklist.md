@@ -13,14 +13,15 @@
 ## Todo
 
 - [ ] Investigate `max_turns` vs `max_consecutive_auto_reply` — verify empirically whether tool call round-trips (Painter tool call → Critic executes → Painter summary) count as separate turns against `max_turns`. Affects how Wave 4 sets round count in `initiate_chat`.
-- [ ] Fix README: `src/painter_critic/` path should be `painter_critic/` (no src/ prefix)
-- [ ] Fix README: round control description says `max_consecutive_auto_reply` but decision is to use `max_turns`
 - [ ] Wave 4: Main module — CLI entrypoint, end-to-end integration
 - [ ] README.md observations section (fill in after running 10 rounds)
 - [ ] Design save-per-round mechanism before Wave 4 — image saving belongs in a hook (`create_save_hook(canvas, tracker, output_dir)`) or in main.py orchestration; hook approach keeps main.py thin
 - [ ] Wire canvas size into `agents.py` system message dynamically from `CANVAS_SIZE` — currently hardcoded "199"/"200x200"
 - [ ] Add instruction to Painter system message to look at the attached canvas image before drawing
 - [ ] Add subject to Critic system message so it can judge whether drawing matches the prompt
+- [ ] Fix README: `src/painter_critic/` path should be `painter_critic/` (no src/ prefix)
+- [ ] Fix README: round control description says `max_consecutive_auto_reply` but decision is to use `max_turns`
+- [ ] Check that there are system prompts for the agents.
 
 ## Future Improvements
 
