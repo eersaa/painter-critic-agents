@@ -67,6 +67,29 @@ def create_save_hook(
     return hook
 
 
+def create_strip_images_hook() -> Callable:
+    """Strip image_url blocks from assistant messages before LLM call.
+
+    Some models reject images in assistant-role messages. This hook removes
+    them so only user-role messages contain images.
+    """
+
+    def hook(messages: list[dict]) -> list[dict]:
+        result = []
+        for msg in messages:
+            if msg.get("role") == "assistant" and isinstance(msg.get("content"), list):
+                msg_copy = dict(msg)
+                msg_copy["content"] = [
+                    b for b in msg["content"] if b.get("type") != "image_url"
+                ]
+                result.append(msg_copy)
+            else:
+                result.append(msg)
+        return result
+
+    return hook
+
+
 def create_reply_hook(canvas: Canvas) -> Callable:
     def hook(messages: list[dict]) -> list[dict]:
         if not messages:

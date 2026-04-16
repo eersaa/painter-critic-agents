@@ -60,8 +60,8 @@ def create_tools(canvas: Canvas) -> dict[str, Callable]:
             f"line drawn from ({x1},{y1}) to ({x2},{y2}) with color {color} width {w}"
         )
 
-    def draw_polygon(points: list[tuple[int, int]], color: str) -> str:
-        """Draw a filled polygon from a list of (x,y) points with the given hex color."""
+    def draw_polygon(points: list[list[int]], color: str) -> str:
+        """Draw a filled polygon from a list of [x,y] coordinate pairs with the given hex color."""
         if len(points) < 3:
             return f"error: polygon requires at least 3 points, got {len(points)}"
         if not _valid_color(color):

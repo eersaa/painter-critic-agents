@@ -17,6 +17,7 @@ from painter_critic.hooks import (
     create_reply_hook,
     create_save_hook,
     create_send_hook,
+    create_strip_images_hook,
 )
 from painter_critic.tools import create_tools
 
@@ -48,27 +49,36 @@ def save_conversation_log(chat_history: list[dict], output_dir: str) -> None:
 
 def setup_pipeline(
     prompt,
+    rounds=DEFAULT_ROUNDS,
     output_dir=OUTPUT_DIR,
     painter_model=DEFAULT_PAINTER_MODEL,
     critic_model=DEFAULT_CRITIC_MODEL,
 ):
-    """Create and wire all components. Returns (painter, critic, canvas, tools)."""
+    """Create and wire all components. Returns (painter, critic, canvas, tools, tracker)."""
     canvas = Canvas(CANVAS_SIZE, CANVAS_SIZE)
     tools = create_tools(canvas)
     painter, critic = create_agents(prompt, painter_model, critic_model, CANVAS_SIZE)
 
+    # Painter LLM generates tool calls; Critic executes them (AG2 receiver pattern)
     for func in tools.values():
         painter.register_for_llm(description=func.__doc__)(func)
-        painter.register_for_execution()(func)
+        critic.register_for_execution()(func)
 
     tracker = RoundTracker()
     critic.register_hook("process_message_before_send", create_send_hook(canvas))
+    # Strip images from assistant messages before Critic's LLM (some models reject them)
+    critic.register_hook(
+        "process_all_messages_before_reply", create_strip_images_hook()
+    )
     critic.register_hook("process_all_messages_before_reply", create_reply_hook(canvas))
     painter.register_hook(
         "process_message_before_send", create_save_hook(canvas, tracker, output_dir)
     )
 
-    return painter, critic, canvas, tools
+    # Terminate after target rounds (checked on Painter's replies by initiate_chat)
+    painter._is_termination_msg = lambda msg: tracker.current_round > rounds
+
+    return painter, critic, canvas, tools, tracker
 
 
 def run_pipeline(
@@ -78,11 +88,12 @@ def run_pipeline(
     painter_model=DEFAULT_PAINTER_MODEL,
     critic_model=DEFAULT_CRITIC_MODEL,
 ):
-    painter, critic, canvas, tools = setup_pipeline(
-        prompt, output_dir, painter_model, critic_model
+    painter, critic, canvas, tools, tracker = setup_pipeline(
+        prompt, rounds, output_dir, painter_model, critic_model
     )
+    # Upper bound: 4 turns per round (tool call + tool result + text + feedback)
     result = critic.initiate_chat(
-        painter, message=f"Please draw: {prompt}", max_turns=rounds
+        painter, message=f"Please draw: {prompt}", max_turns=rounds * 4
     )
     return result
 

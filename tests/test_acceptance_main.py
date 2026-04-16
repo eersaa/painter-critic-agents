@@ -41,7 +41,9 @@ def _run_mocked_pipeline(output_dir, rounds=3, painter_reply_factory=None):
 
     Returns (ChatResult, canvas, tools).
     """
-    painter, critic, canvas, tools = setup_pipeline("test subject", output_dir)
+    painter, critic, canvas, tools, tracker = setup_pipeline(
+        "test subject", rounds=rounds, output_dir=output_dir
+    )
 
     if painter_reply_factory:
         reply_func = painter_reply_factory(tools)
@@ -59,6 +61,7 @@ def _run_mocked_pipeline(output_dir, rounds=3, painter_reply_factory=None):
         remove_other_reply_funcs=True,
     )
 
+    # Mocked agents don't generate tool_calls, so max_turns = rounds suffices
     result = critic.initiate_chat(
         painter, message="Please draw: test subject", max_turns=rounds, silent=True
     )
