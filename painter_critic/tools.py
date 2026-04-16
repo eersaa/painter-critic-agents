@@ -14,7 +14,7 @@ def _clamp(value: int, lo: int, hi: int) -> int:
     return max(lo, min(hi, value))
 
 
-def create_tools(canvas: Canvas) -> list[Callable]:
+def create_tools(canvas: Canvas) -> dict[str, Callable]:
     width, height = canvas.size
     max_x = width - 1
     max_y = height - 1
@@ -72,4 +72,9 @@ def create_tools(canvas: Canvas) -> list[Callable]:
         canvas.draw().polygon(clamped, fill=color)
         return f"polygon drawn with {len(clamped)} points and color {color}"
 
-    return [draw_rectangle, draw_circle, draw_line, draw_polygon]
+    return {
+        "draw_rectangle": draw_rectangle,
+        "draw_circle": draw_circle,
+        "draw_line": draw_line,
+        "draw_polygon": draw_polygon,
+    }
