@@ -15,10 +15,9 @@ Critic.initiate_chat(Painter, message=initial_prompt+canvas_image, max_turns=10)
 **Per-turn flow:**
 1. Critic sends feedback + canvas image to Painter
 2. Painter LLM generates tool calls (draw_rectangle, etc.)
-3. Critic executes tool calls (standard AG2 caller/executor pattern)
-4. Tool results sent back to Painter
-5. Painter responds with summary of what it drew
-6. Critic's custom reply hook: renders canvas, saves round image, injects image into LLM context, generates visual feedback
+3. Painter executes its own tool calls (self-execution pattern — both caller and executor)
+4. Painter responds with summary of what it drew
+5. Critic's custom reply hook: renders canvas, saves round image, injects image into LLM context, generates visual feedback
 
 **Round control:** `max_turns` may not map 1:1 to "rounds" since tool call exchanges count as turns. Need to verify with a minimal test. Fallback: use `max_consecutive_auto_reply` or a termination function checking `RoundTracker.current_round >= target`.
 
@@ -48,7 +47,7 @@ Each returns a success description string (or error description on invalid input
 
 ### Agents (`agents.py`)
 
-Creates two `ConversableAgent`s. Painter (`openai/gpt-4.1-mini`): system message instructs it to draw using tools based on the user's subject prompt and critic feedback, coordinates within 0-199. Critic (`qwen/qwen3.5-flash-02-23`): system message instructs it to visually evaluate the canvas image and return structured feedback (progress, strengths, improvements, priority). Tools registered with `register_function(func, caller=painter, executor=critic)`.
+Creates two `ConversableAgent`s. Painter (`openai/gpt-4.1-mini`): system message instructs it to draw using tools based on the user's subject prompt and critic feedback, coordinates within 0-199. Critic (`qwen/qwen3.5-flash-02-23`): system message instructs it to visually evaluate the canvas image and return structured feedback (progress, strengths, improvements, priority). Tools registered on Painter for both LLM and execution (`register_for_llm(painter)` + `register_for_execution(painter)`) — Painter decides what to draw and executes it, then hands the result back to Critic.
 
 ### Hooks (`hooks.py`)
 
@@ -76,7 +75,7 @@ tests/
 - **Model defaults:** `openai/gpt-4.1-mini` for Painter, `qwen/qwen3.5-flash-02-23` for Critic. Configurable via CLI flags `--painter-model` and `--critic-model`
 - **Subject:** User-provided via CLI argument. E.g. `python -m painter_critic "a house with a sun and trees"`
 - **4 drawing tools:** `draw_rectangle`, `draw_circle`, `draw_line`, `draw_polygon` — covers all needed shapes (rectangles for walls/windows/sky, circle for sun, polygon for roof, lines for details)
-- **Tool registration:** `register_function(func, caller=painter, executor=critic)` — AG2-idiomatic pattern
+- **Tool registration:** `register_for_llm(painter)` + `register_for_execution(painter)` — Painter self-executes tools, Critic only reviews
 - **Canvas:** Mutable `Canvas` object shared via closures in tool functions
 - **Image format:** Base64-encoded PNG in OpenAI vision format `{"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}`
 
