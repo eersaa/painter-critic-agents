@@ -36,7 +36,6 @@ def create_agents(
         human_input_mode="NEVER",
         code_execution_config=False,
     )
-    painter.code_execution_config = False
 
     critic = ConversableAgent(
         name="Critic",
@@ -45,6 +44,5 @@ def create_agents(
         human_input_mode="NEVER",
         code_execution_config=False,
     )
-    critic.code_execution_config = False
 
     return painter, critic

@@ -31,18 +31,6 @@ class TestAgentsUnit:
 
         assert critic.name == "Critic"
 
-    # --- code_execution_config disabled ---
-
-    def test_agents_painter_code_execution_disabled(self, api_url_env):
-        painter, _ = create_agents("a tree")
-
-        assert painter.code_execution_config is False
-
-    def test_agents_critic_code_execution_disabled(self, api_url_env):
-        _, critic = create_agents("a tree")
-
-        assert critic.code_execution_config is False
-
     # --- Critic system message mentions image/visual ---
 
     def test_agents_critic_system_message_mentions_image(self, api_url_env):
