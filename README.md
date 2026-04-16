@@ -62,7 +62,7 @@ The Critic acts as both the visual evaluator (via its LLM) and the tool executor
 
 ### Round Control
 
-The assignment defines a "round" as one Painter draw + one Critic review. AG2's `max_turns` counts conversational exchanges, which may not map 1:1 to rounds because tool call and result messages also count as exchanges. To ensure exactly the configured number of rounds, we use `max_consecutive_auto_reply` or a termination function that checks the `RoundTracker` counter against the target, rather than relying solely on `max_turns`.
+The assignment defines a "round" as one Painter draw + one Critic review. `max_turns` controls the number of rounds; tool execution happens inside `generate_reply()` and does not consume extra turns.
 
 ### Model Choice
 
@@ -98,7 +98,7 @@ Both hooks include guards to skip image injection on tool-execution result messa
 The system is decomposed into six modules with clear separation of concerns:
 
 ```
-src/painter_critic/
+painter_critic/
   config.py   -- Configuration, CLI args, LLM config
   canvas.py   -- Canvas state (PIL wrapper, PNG save, base64 encoding)
   tools.py    -- Drawing tool functions
