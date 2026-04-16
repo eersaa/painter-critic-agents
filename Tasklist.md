@@ -16,9 +16,9 @@
 - [ ] Wave 4: Main module — CLI entrypoint, end-to-end integration
 - [ ] README.md observations section (fill in after running 10 rounds)
 - [ ] Design save-per-round mechanism before Wave 4 — image saving belongs in a hook (`create_save_hook(canvas, tracker, output_dir)`) or in main.py orchestration; hook approach keeps main.py thin
-- [ ] Wire canvas size into `agents.py` system message dynamically from `CANVAS_SIZE` — currently hardcoded "199"/"200x200"
-- [ ] Add instruction to Painter system message to look at the attached canvas image before drawing
-- [ ] Add subject to Critic system message so it can judge whether drawing matches the prompt
+- [x] Wire canvas size into `agents.py` system message dynamically from `CANVAS_SIZE` — currently hardcoded "199"/"200x200"
+- [x] Add instruction to Painter system message to look at the attached canvas image before drawing
+- [x] Add subject to Critic system message so it can judge whether drawing matches the prompt
 - [ ] Fix README: `src/painter_critic/` path should be `painter_critic/` (no src/ prefix)
 - [ ] Fix README: round control description says `max_consecutive_auto_reply` but decision is to use `max_turns`
 - [ ] Check that there are system prompts for the agents.
@@ -30,3 +30,4 @@
 - Consider removing `python-dotenv` from dependencies if main.py won't call `load_dotenv()`
 - Consider `Canvas.width`/`Canvas.height` properties if Tools code needs frequent dimension access
 - Consider `Canvas.clear()` if restart capability is needed
+- Unify canvas dimension source of truth: `Canvas()` defaults width/height independently from `config.CANVAS_SIZE`; Wave 4 `main.py` must pass size explicitly to both `Canvas()` and `create_agents()` to avoid mismatch

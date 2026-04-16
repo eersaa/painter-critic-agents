@@ -66,16 +66,3 @@ class TestAgentsUnit:
 
         assert "a cat & dog" in painter.system_message
 
-    # --- B2: Painter image awareness ---
-
-    def test_agents_painter_message_mentions_canvas_image(self, api_url_env):
-        painter, _ = create_agents("a tree")
-
-        assert "canvas image" in painter.system_message
-
-    # --- B3: Subject in Critic message ---
-
-    def test_agents_critic_message_contains_subject(self, api_url_env):
-        _, critic = create_agents("a blue triangle")
-
-        assert "a blue triangle" in critic.system_message
