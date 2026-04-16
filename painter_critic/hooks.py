@@ -52,6 +52,17 @@ def create_send_hook(canvas: Canvas) -> Callable:
     return hook
 
 
+def create_save_hook(canvas: Canvas, tracker: RoundTracker, output_dir: str) -> Callable:
+    def hook(sender, message, recipient, silent):
+        if _is_tool_message(message):
+            return message
+        canvas.save(tracker.get_image_path(output_dir))
+        tracker.increment()
+        return message
+
+    return hook
+
+
 def create_reply_hook(canvas: Canvas) -> Callable:
     def hook(messages: list[dict]) -> list[dict]:
         if not messages:
