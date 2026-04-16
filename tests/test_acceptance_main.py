@@ -148,9 +148,7 @@ class TestPipelineAcceptance:
     ):
         result, _, _ = _run_mocked_pipeline(str(tmp_output_dir), rounds=2)
 
-        critic_messages = [
-            m for m in result.chat_history if m.get("name") == "Critic"
-        ]
+        critic_messages = [m for m in result.chat_history if m.get("name") == "Critic"]
         assert len(critic_messages) > 0
         has_image = any(
             isinstance(m.get("content"), list)

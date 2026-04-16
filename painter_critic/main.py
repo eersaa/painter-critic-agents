@@ -12,7 +12,12 @@ from painter_critic.config import (
     OUTPUT_DIR,
     parse_args,
 )
-from painter_critic.hooks import RoundTracker, create_reply_hook, create_save_hook, create_send_hook
+from painter_critic.hooks import (
+    RoundTracker,
+    create_reply_hook,
+    create_save_hook,
+    create_send_hook,
+)
 from painter_critic.tools import create_tools
 
 
@@ -29,7 +34,9 @@ def save_conversation_log(chat_history: list[dict], output_dir: str) -> None:
         if content is None:
             text = "[tool call]"
         elif isinstance(content, list):
-            text_blocks = [block["text"] for block in content if block.get("type") == "text"]
+            text_blocks = [
+                block["text"] for block in content if block.get("type") == "text"
+            ]
             text = "\n".join(text_blocks)
         else:
             text = content
@@ -46,8 +53,6 @@ def run_pipeline(
     painter_model=DEFAULT_PAINTER_MODEL,
     critic_model=DEFAULT_CRITIC_MODEL,
 ):
-    from autogen.agentchat.chat import ChatResult  # noqa: F401
-
     canvas = Canvas(CANVAS_SIZE, CANVAS_SIZE)
     tools = create_tools(canvas)
     painter, critic = create_agents(prompt, painter_model, critic_model, CANVAS_SIZE)
@@ -59,14 +64,20 @@ def run_pipeline(
     tracker = RoundTracker()
     critic.register_hook("process_message_before_send", create_send_hook(canvas))
     critic.register_hook("process_all_messages_before_reply", create_reply_hook(canvas))
-    painter.register_hook("process_message_before_send", create_save_hook(canvas, tracker, output_dir))
+    painter.register_hook(
+        "process_message_before_send", create_save_hook(canvas, tracker, output_dir)
+    )
 
-    result = critic.initiate_chat(painter, message=f"Please draw: {prompt}", max_turns=rounds)
+    result = critic.initiate_chat(
+        painter, message=f"Please draw: {prompt}", max_turns=rounds
+    )
     return result
 
 
 def main(argv: list[str] | None = None) -> None:
     load_dotenv()
     args = parse_args(argv)
-    result = run_pipeline(args.prompt, args.rounds, OUTPUT_DIR, args.painter_model, args.critic_model)
+    result = run_pipeline(
+        args.prompt, args.rounds, OUTPUT_DIR, args.painter_model, args.critic_model
+    )
     save_conversation_log(result.chat_history, OUTPUT_DIR)

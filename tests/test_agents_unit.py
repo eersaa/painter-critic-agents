@@ -65,4 +65,3 @@ class TestAgentsUnit:
         painter, _ = create_agents("a cat & dog")
 
         assert "a cat & dog" in painter.system_message
-
