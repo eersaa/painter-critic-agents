@@ -8,19 +8,24 @@
 - [x] Wave 2: Tools module — drawing functions (rectangle, circle, line, polygon)
 - [x] Wave 2: Hooks module — RoundTracker, image injection hooks
 - [x] Architect review Wave 2: type annotations + docstrings on tool functions (needed for AG2 schema), fixed polygon validation order
+- [x] Wave 3: Agents module — Painter + Critic ConversableAgents (20 tests)
 
 ## Todo
 
-- [ ] Investigate `max_turns` vs `max_consecutive_auto_reply` — verify empirically whether tool call round-trips (Painter tool call → Critic executes → Painter summary) count as separate turns against `max_turns`. README and Wave 2 plan contradict each other. Affects how Wave 3 sets round count in `initiate_chat`.
+- [ ] Investigate `max_turns` vs `max_consecutive_auto_reply` — verify empirically whether tool call round-trips (Painter tool call → Critic executes → Painter summary) count as separate turns against `max_turns`. Affects how Wave 4 sets round count in `initiate_chat`.
 - [ ] Fix README: `src/painter_critic/` path should be `painter_critic/` (no src/ prefix)
 - [ ] Fix README: round control description says `max_consecutive_auto_reply` but decision is to use `max_turns`
-- [ ] Wave 3: Agents module — Painter + Critic ConversableAgents
 - [ ] Wave 4: Main module — CLI entrypoint, end-to-end integration
 - [ ] README.md observations section (fill in after running 10 rounds)
+- [ ] Design save-per-round mechanism before Wave 4 — image saving belongs in a hook (`create_save_hook(canvas, tracker, output_dir)`) or in main.py orchestration; hook approach keeps main.py thin
+- [ ] Wire canvas size into `agents.py` system message dynamically from `CANVAS_SIZE` — currently hardcoded "199"/"200x200"
+- [ ] Add instruction to Painter system message to look at the attached canvas image before drawing
+- [ ] Add subject to Critic system message so it can judge whether drawing matches the prompt
 
 ## Future Improvements
 
-- Consider returning `dict[str, Callable]` from `create_tools` instead of list — cleaner for AG2 `register_function` calls in Wave 3 (currently fragile index-based unpacking)
+- Consider returning `dict[str, Callable]` from `create_tools` instead of list — fragile index-based unpacking; fix before Wave 4 adds another consumer
 - Consider moving `RoundTracker` out of `hooks.py` — it's not a hook, it manages round lifecycle state; could live in `config.py` or its own module
+- Consider removing `python-dotenv` from dependencies if main.py won't call `load_dotenv()`
 - Consider `Canvas.width`/`Canvas.height` properties if Tools code needs frequent dimension access
 - Consider `Canvas.clear()` if restart capability is needed
