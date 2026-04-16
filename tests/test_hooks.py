@@ -1,7 +1,12 @@
 import copy
 
 from painter_critic.canvas import Canvas
-from painter_critic.hooks import RoundTracker, create_reply_hook, create_send_hook
+from painter_critic.hooks import (
+    RoundTracker,
+    create_reply_hook,
+    create_save_hook,
+    create_send_hook,
+)
 
 
 class TestRoundTrackerUnit:
@@ -325,3 +330,111 @@ class TestReplyHookUnit:
         ][0]
 
         assert blank_image != drawn_image
+
+
+class TestSaveHookUnit:
+    # -- Returns callable --
+
+    def test_save_hook_returns_callable(self):
+        canvas = Canvas()
+        tracker = RoundTracker()
+
+        hook = create_save_hook(canvas, tracker, "output")
+
+        assert callable(hook)
+
+    # -- Non-tool message: saves file --
+
+    def test_save_hook_non_tool_message_saves_file(self, tmp_output_dir):
+        canvas = Canvas()
+        tracker = RoundTracker()
+        hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
+        msg = {"content": "Nice painting", "role": "assistant"}
+
+        hook("painter", msg, "critic", False)
+
+        expected_path = tmp_output_dir / "round_01.png"
+        assert expected_path.exists()
+
+    # -- Non-tool message: increments tracker --
+
+    def test_save_hook_non_tool_message_increments_tracker(self, tmp_output_dir):
+        canvas = Canvas()
+        tracker = RoundTracker()
+        hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
+        msg = {"content": "Nice painting", "role": "assistant"}
+
+        hook("painter", msg, "critic", False)
+
+        assert tracker.current_round == 2
+
+    # -- Non-tool message: returns original message unchanged --
+
+    def test_save_hook_non_tool_message_returns_message_unchanged(self, tmp_output_dir):
+        canvas = Canvas()
+        tracker = RoundTracker()
+        hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
+        msg = {"content": "Nice painting", "role": "assistant"}
+
+        result = hook("painter", msg, "critic", False)
+
+        assert result is msg
+
+    # -- Successive calls save to incrementing paths --
+
+    def test_save_hook_successive_calls_save_incrementing_filenames(
+        self, tmp_output_dir
+    ):
+        canvas = Canvas()
+        tracker = RoundTracker()
+        hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
+        msg = {"content": "text", "role": "assistant"}
+
+        hook("painter", msg, "critic", False)
+        hook("painter", msg, "critic", False)
+
+        assert (tmp_output_dir / "round_01.png").exists()
+        assert (tmp_output_dir / "round_02.png").exists()
+
+    # -- Guard: tool_calls message --
+
+    def test_save_hook_tool_calls_message_no_file_written(self, tmp_output_dir):
+        canvas = Canvas()
+        tracker = RoundTracker()
+        hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
+        msg = {"content": "call", "tool_calls": [{"id": "1"}]}
+
+        result = hook("painter", msg, "critic", False)
+
+        assert not tmp_output_dir.exists() or not any(tmp_output_dir.iterdir())
+        assert tracker.current_round == 1
+        assert result is msg
+
+    # -- Guard: role=tool message --
+
+    def test_save_hook_role_tool_message_no_file_written(self, tmp_output_dir):
+        canvas = Canvas()
+        tracker = RoundTracker()
+        hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
+        msg = {"content": "result", "role": "tool"}
+
+        result = hook("painter", msg, "critic", False)
+
+        assert not tmp_output_dir.exists() or not any(tmp_output_dir.iterdir())
+        assert tracker.current_round == 1
+        assert result is msg
+
+    # -- Saved file is valid PNG --
+
+    def test_save_hook_saved_file_is_valid_png(self, tmp_output_dir):
+        canvas = Canvas()
+        tracker = RoundTracker()
+        hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
+        msg = {"content": "text", "role": "assistant"}
+
+        hook("painter", msg, "critic", False)
+
+        saved = tmp_output_dir / "round_01.png"
+        with open(saved, "rb") as f:
+            header = f.read(8)
+        assert header[:4] == b"\x89PNG"
