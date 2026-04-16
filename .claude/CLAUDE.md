@@ -22,7 +22,10 @@ When you are creating a plan, implementing or fixing issue always use following 
    3. **reviewer** - refactor - lints, refactors for quality.
 8. Review the project with **system-architect**, make changes based on feedback and run **all** test suites.
 
-Finally, update `Tasklist.md` for Todo items, done task history and future improvements.
+Finally, update `Tasklist.md` for:
+1. Todo items
+2. Done task history
+3. Future improvements.
 
 ## System design principles
 

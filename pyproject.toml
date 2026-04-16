@@ -1,0 +1,19 @@
+[project]
+name = "painter-critic"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "ag2[openai]>=0.11.0",
+    "Pillow>=10.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.4.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: real API tests"]
+
+[tool.ruff]
+line-length = 88
