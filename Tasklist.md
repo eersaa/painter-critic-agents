@@ -21,6 +21,7 @@
 
 - [ ] README.md observations section (fill in after running 10 rounds)
 - [ ] Run full 10-round pipeline with real API and verify output
+- [x] Update README round control and hook sections to reflect actual architecture
 
 ## Future Improvements
 

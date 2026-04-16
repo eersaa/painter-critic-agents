@@ -62,7 +62,7 @@ The Critic acts as both the visual evaluator (via its LLM) and the tool executor
 
 ### Round Control
 
-The assignment defines a "round" as one Painter draw + one Critic review. `max_turns` controls the number of rounds; tool execution happens inside `generate_reply()` and does not consume extra turns.
+A "round" is one Painter draw + one Critic review. Tool execution in AG2 consumes extra turns within `initiate_chat`, so `max_turns` alone cannot control the number of painting rounds. Instead, termination is driven by `RoundTracker`: after the Painter's `process_message_before_send` hook saves a snapshot and increments the round counter, `painter._is_termination_msg` checks whether `tracker.current_round > rounds`. `max_turns=rounds*4` serves as an upper-bound safety net.
 
 ### Model Choice
 
@@ -86,12 +86,17 @@ Each tool operates on a shared mutable `Canvas` instance via closures, validates
 
 ### Multimodal Image Handling
 
-Both agents see the actual canvas image using base64-encoded PNGs in OpenAI's vision message format. Image injection uses two AG2 hook mechanisms:
+Both agents see the actual canvas image using base64-encoded PNGs in OpenAI's vision message format. Four hooks are registered to manage image flow and round tracking:
 
-- **`process_message_before_send`** on the Critic attaches the rendered canvas to outgoing feedback messages so the Painter sees what the canvas looks like before deciding what to draw next. These changes are permanent in the message history.
-- **`process_all_messages_before_reply`** on the Critic temporarily injects the canvas into the LLM context before generating feedback, so the Critic can visually evaluate the artwork without duplicating images in the conversation history.
+**On Critic:**
 
-Both hooks include guards to skip image injection on tool-execution result messages.
+- **`create_send_hook`** (`process_message_before_send`) — attaches the current canvas image to outgoing feedback messages so the Painter sees what the canvas looks like. Changes are permanent in message history. Skips tool-execution messages.
+- **`create_strip_images_hook`** (`process_all_messages_before_reply`) — strips `image_url` blocks from assistant-role messages before the Critic's LLM call. Required because some models (e.g. Qwen) reject images in assistant messages.
+- **`create_reply_hook`** (`process_all_messages_before_reply`) — temporarily injects the current canvas into the last message before the Critic's LLM generates feedback, enabling visual evaluation without duplicating images in history.
+
+**On Painter:**
+
+- **`create_save_hook`** (`process_message_before_send`) — saves a PNG snapshot of the canvas after each Painter reply and increments the `RoundTracker`. Skips tool-execution messages.
 
 ### Module Structure
 
