@@ -9,13 +9,13 @@
 - [x] Wave 2: Hooks module — RoundTracker, image injection hooks
 - [x] Architect review Wave 2: type annotations + docstrings on tool functions (needed for AG2 schema), fixed polygon validation order
 - [x] Wave 3: Agents module — Painter + Critic ConversableAgents (20 tests)
+- [x] Pre-Wave 4 Unit C: `create_save_hook` — side-effect hook that snapshots canvas after each Painter round (181 tests); hardened `_is_tool_message` to handle `str | dict`
 
 ## Todo
 
 - [ ] Investigate `max_turns` vs `max_consecutive_auto_reply` — verify empirically whether tool call round-trips (Painter tool call → Critic executes → Painter summary) count as separate turns against `max_turns`. Affects how Wave 4 sets round count in `initiate_chat`.
 - [ ] Wave 4: Main module — CLI entrypoint, end-to-end integration
 - [ ] README.md observations section (fill in after running 10 rounds)
-- [ ] Design save-per-round mechanism before Wave 4 — image saving belongs in a hook (`create_save_hook(canvas, tracker, output_dir)`) or in main.py orchestration; hook approach keeps main.py thin
 - [x] Wire canvas size into `agents.py` system message dynamically from `CANVAS_SIZE` — currently hardcoded "199"/"200x200"
 - [x] Add instruction to Painter system message to look at the attached canvas image before drawing
 - [x] Add subject to Critic system message so it can judge whether drawing matches the prompt
