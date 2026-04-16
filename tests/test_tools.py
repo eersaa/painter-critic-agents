@@ -39,7 +39,12 @@ class TestToolsFactory:
         tools = create_tools(canvas)
 
         assert isinstance(tools, dict)
-        assert set(tools.keys()) == {"draw_rectangle", "draw_circle", "draw_line", "draw_polygon"}
+        assert set(tools.keys()) == {
+            "draw_rectangle",
+            "draw_circle",
+            "draw_line",
+            "draw_polygon",
+        }
 
     def test_create_tools_all_values_are_callable(self, canvas):
         tools = create_tools(canvas)
