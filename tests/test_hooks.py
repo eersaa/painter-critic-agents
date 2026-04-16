@@ -406,7 +406,7 @@ class TestSaveHookUnit:
 
         result = hook("painter", msg, "critic", False)
 
-        assert not tmp_output_dir.exists() or not any(tmp_output_dir.iterdir())
+        assert not tmp_output_dir.exists()
         assert tracker.current_round == 1
         assert result is msg
 
@@ -420,7 +420,7 @@ class TestSaveHookUnit:
 
         result = hook("painter", msg, "critic", False)
 
-        assert not tmp_output_dir.exists() or not any(tmp_output_dir.iterdir())
+        assert not tmp_output_dir.exists()
         assert tracker.current_round == 1
         assert result is msg
 

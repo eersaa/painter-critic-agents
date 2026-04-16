@@ -52,7 +52,9 @@ def create_send_hook(canvas: Canvas) -> Callable:
     return hook
 
 
-def create_save_hook(canvas: Canvas, tracker: RoundTracker, output_dir: str) -> Callable:
+def create_save_hook(
+    canvas: Canvas, tracker: RoundTracker, output_dir: str
+) -> Callable:
     def hook(sender, message, recipient, silent):
         if _is_tool_message(message):
             return message
