@@ -132,11 +132,11 @@ def run_pipeline(
     )
 
     # Phase 2: critique loop. Painter initiates with Critic.
-    # max_turns = rounds * 2 → `rounds` painter sends + `rounds` critic replies.
+    # max_turns = number of rounds to iterate on the drawing
     result = painter.initiate_chat(
         critic,
         message=f"I have painted: {prompt}. Please review.",
-        max_turns=rounds * 2,
+        max_turns=rounds,
     )
     return result
 
