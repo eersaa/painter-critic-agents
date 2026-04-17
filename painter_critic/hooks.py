@@ -97,31 +97,17 @@ def create_strip_assistant_images_hook() -> Callable:
 
 
 def create_prune_stale_user_images_hook() -> Callable:
-    """Strip image_url blocks from every user message except the last one.
-
-    Reason: preventing stale canvas accumulation across rounds — reply_hook
-    re-attaches the current canvas to the last message.
+    """Strip image_url blocks from every user message to prevent stale canvas
+    accumulation across rounds. Reply_hook re-attaches the current canvas to
+    the last non-tool message on every LLM call.
     """
 
     def hook(messages: list[dict]) -> list[dict]:
-        last_user_idx = next(
-            (
-                i
-                for i in range(len(messages) - 1, -1, -1)
-                if messages[i].get("role") == "user"
-            ),
-            None,
-        )
-
         return [
-            msg
-            if not (
-                msg.get("role") == "user"
-                and isinstance(msg.get("content"), list)
-                and i != last_user_idx
-            )
-            else _strip_images(msg)
-            for i, msg in enumerate(messages)
+            _strip_images(msg)
+            if msg.get("role") == "user" and isinstance(msg.get("content"), list)
+            else msg
+            for msg in messages
         ]
 
     return hook
