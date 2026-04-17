@@ -198,7 +198,7 @@ class TestPipelineAcceptance:
         from painter_critic.main import save_conversation_log
 
         result, _, _ = _run_mocked_pipeline(str(tmp_output_dir), rounds=2)
-        save_conversation_log(result.chat_history, str(tmp_output_dir))
+        save_conversation_log(result.chat_history, str(tmp_output_dir), "test subject")
 
         log_path = tmp_output_dir / "conversation.log"
         assert log_path.exists()
@@ -212,7 +212,7 @@ class TestPipelineAcceptance:
         from painter_critic.main import save_conversation_log
 
         result, _, _ = _run_mocked_pipeline(str(tmp_output_dir), rounds=2)
-        save_conversation_log(result.chat_history, str(tmp_output_dir))
+        save_conversation_log(result.chat_history, str(tmp_output_dir), "test subject")
 
         content = (tmp_output_dir / "conversation.log").read_text()
         assert "data:image/png;base64," not in content
@@ -257,6 +257,23 @@ class TestPipelineAcceptance:
         )
         assert has_image
 
+    def test_pipeline_log_includes_user_prompt_before_agent_messages(
+        self, tmp_output_dir, api_url_env
+    ):
+        from painter_critic.main import save_conversation_log
+
+        result, _, _ = _run_mocked_pipeline(str(tmp_output_dir), rounds=1)
+        save_conversation_log(
+            result.chat_history, str(tmp_output_dir), prompt="test subject"
+        )
+
+        content = (tmp_output_dir / "conversation.log").read_text()
+        assert "--- User ---" in content
+        assert "Paint: test subject" in content
+        assert content.index("--- User ---") < content.index("--- Painter ---"), (
+            "User block must precede first Painter block"
+        )
+
     def test_pipeline_critic_feedback_text_reaches_painter(
         self, tmp_output_dir, api_url_env
     ):
@@ -300,12 +317,13 @@ class TestPipelineSlowAcceptance:
         from painter_critic.main import run_pipeline, save_conversation_log
 
         output_dir = tmp_path_factory.mktemp("slow_output")
+        prompt = "a red circle on blue background"
         result = run_pipeline(
-            prompt="a red circle on blue background",
+            prompt=prompt,
             rounds=2,
             output_dir=str(output_dir),
         )
-        save_conversation_log(result.chat_history, str(output_dir))
+        save_conversation_log(result.chat_history, str(output_dir), prompt=prompt)
         return output_dir
 
     def test_pipeline_real_api_two_rounds_produces_images(self, real_pipeline_output):
@@ -323,9 +341,9 @@ class TestPipelineSlowAcceptance:
         assert "--- Unknown ---" not in content
 
     def test_pipeline_real_api_log_only_painter_and_critic(self, real_pipeline_output):
-        """Outer chat is Painter↔Critic only. Tool execution lives in nested chat."""
+        """Outer chat is Painter↔Critic only (plus the synthetic User prompt header).
+        Tool execution lives in nested chat."""
         content = (real_pipeline_output / "conversation.log").read_text()
         headers = {line for line in content.splitlines() if line.startswith("--- ")}
-        assert headers <= {"--- Painter ---", "--- Critic ---"}, (
-            f"Unexpected labels: {headers - {'--- Painter ---', '--- Critic ---'}}"
-        )
+        allowed = {"--- Painter ---", "--- Critic ---", "--- User ---"}
+        assert headers <= allowed, f"Unexpected labels: {headers - allowed}"
