@@ -108,16 +108,18 @@ class TestSaveConversationLogUnit:
         assert tmp_output_dir.exists()
         assert (tmp_output_dir / "conversation.log").exists()
 
-    # --- Empty history creates empty file ---
+    # --- Empty history still emits User header ---
 
-    def test_main_save_log_empty_history_creates_empty_file(self, tmp_output_dir):
+    def test_main_save_log_empty_history_contains_only_user_header(
+        self, tmp_output_dir
+    ):
         from painter_critic.main import save_conversation_log
 
-        save_conversation_log([], str(tmp_output_dir), "x")
+        save_conversation_log([], str(tmp_output_dir), "a red square")
 
         log_path = tmp_output_dir / "conversation.log"
         assert log_path.exists()
-        assert log_path.read_text() == ""
+        assert log_path.read_text() == "--- User ---\nPaint: a red square\n\n"
 
     # --- Message format: "--- {name} ---\n{content}\n\n" ---
 
