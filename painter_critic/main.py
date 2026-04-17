@@ -24,7 +24,9 @@ from painter_critic.hooks import (
 from painter_critic.tools import create_tools
 
 
-def save_conversation_log(chat_history: list[dict], output_dir: str, prompt: str) -> None:
+def save_conversation_log(
+    chat_history: list[dict], output_dir: str, prompt: str
+) -> None:
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     log_path = out / "conversation.log"
@@ -37,10 +39,9 @@ def save_conversation_log(chat_history: list[dict], output_dir: str, prompt: str
         if content is None:
             text = "[tool call]"
         elif isinstance(content, list):
-            text_blocks = [
+            text = "\n".join(
                 block["text"] for block in content if block.get("type") == "text"
-            ]
-            text = "\n".join(text_blocks)
+            )
         else:
             text = content
 

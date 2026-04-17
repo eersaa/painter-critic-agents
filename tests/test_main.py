@@ -183,9 +183,7 @@ class TestSaveConversationLogUnit:
 
     # --- User prompt header prepended to log ---
 
-    def test_main_save_log_prepends_user_header_when_prompt_given(
-        self, tmp_output_dir
-    ):
+    def test_main_save_log_prepends_user_header_when_prompt_given(self, tmp_output_dir):
         from painter_critic.main import save_conversation_log
 
         history = [{"name": "Painter", "content": "done", "role": "assistant"}]
