@@ -41,7 +41,7 @@ class TestHooksAcceptance:
         hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
         expected_path = tracker.get_image_path(str(tmp_output_dir))
 
-        hook(None, {"content": "done drawing", "role": "assistant"}, None, False)
+        hook(None, {"content": "done drawing", "role": "assistant"}, "Critic", False)
 
         assert os.path.exists(expected_path)
 
@@ -50,7 +50,7 @@ class TestHooksAcceptance:
         tracker = RoundTracker()
         hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
 
-        hook(None, {"content": "done drawing", "role": "assistant"}, None, False)
+        hook(None, {"content": "done drawing", "role": "assistant"}, "Critic", False)
 
         assert tracker.current_round == 2
 
@@ -60,7 +60,23 @@ class TestHooksAcceptance:
         tracker = RoundTracker()
         hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
 
-        hook(None, {"role": "tool", "content": "draw result"}, None, False)
+        hook(None, {"role": "tool", "content": "draw result"}, "Critic", False)
+
+        assert not os.path.exists(str(tmp_output_dir))
+        assert tracker.current_round == 1
+
+    def test_hooks_save_hook_skips_when_recipient_not_critic(self, tmp_output_dir):
+        """Phase 1 pre-draw (recipient=PainterExecutor) must not save — only Phase 2 painter→critic sends."""
+        canvas = Canvas()
+        tracker = RoundTracker()
+        hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
+
+        hook(
+            None,
+            {"content": "done drawing", "role": "assistant"},
+            "PainterExecutor",
+            False,
+        )
 
         assert not os.path.exists(str(tmp_output_dir))
         assert tracker.current_round == 1

@@ -8,7 +8,11 @@ from painter_critic.main import setup_pipeline
 
 
 def _make_painter_mock(tools):
-    """Mock reply: directly calls drawing tools, returns text summary."""
+    """Mock reply: directly calls drawing tools, returns text summary.
+
+    Each call draws one shape and returns a summary. Covers pre-draw phase
+    (first call) and critique-loop rounds (subsequent calls).
+    """
     call_count = [0]
 
     def reply(recipient, messages=None, sender=None, config=None):
@@ -31,17 +35,22 @@ def _critic_mock(recipient, messages=None, sender=None, config=None):
     return (True, "CRITIC_FEEDBACK: Add more details to improve the picture.")
 
 
+def _executor_mock(recipient, messages=None, sender=None, config=None):
+    """PainterExecutor has no LLM. Mock its reply so the pre-draw chat terminates."""
+    return (True, "TERMINATE")
+
+
 def _run_mocked_pipeline(output_dir, rounds=3, painter_reply_factory=None):
-    """Use real setup_pipeline wiring, inject mock LLM replies, run chat.
+    """Use real setup_pipeline wiring, inject mock replies, run both phases.
 
     Args:
         output_dir: Directory for output images.
-        rounds: Number of conversation rounds.
+        rounds: Number of critique-loop rounds.
         painter_reply_factory: Callable(tools) -> reply_func. If None, uses default mock.
 
-    Returns (ChatResult, canvas, tools).
+    Returns (ChatResult from Phase 2, canvas, tools).
     """
-    painter, critic, canvas, tools, tracker = setup_pipeline(
+    painter, painter_executor, critic, canvas, tools, tracker = setup_pipeline(
         "test subject", rounds=rounds, output_dir=output_dir
     )
 
@@ -60,12 +69,59 @@ def _run_mocked_pipeline(output_dir, rounds=3, painter_reply_factory=None):
         reply_func=_critic_mock,
         remove_other_reply_funcs=True,
     )
+    painter_executor.register_reply(
+        trigger=ConversableAgent,
+        reply_func=_executor_mock,
+        remove_other_reply_funcs=True,
+    )
 
-    # Mocked agents don't generate tool_calls, so max_turns = rounds suffices
-    result = critic.initiate_chat(
-        painter, message="Please draw: test subject", max_turns=rounds, silent=True
+    # Phase 1: pre-draw. Executor kicks off, Painter mock replies once (draws).
+    # max_turns=2 → executor initial msg + painter reply; no save (recipient is not Critic).
+    painter_executor.initiate_chat(
+        painter, message="Paint: test subject", max_turns=2, silent=True
+    )
+
+    # Phase 2: critique loop. Painter initiates with Critic.
+    # max_turns = rounds * 2 → `rounds` painter sends + `rounds` critic replies.
+    # Each painter send to Critic triggers save_hook → N images for N rounds.
+    result = painter.initiate_chat(
+        critic,
+        message="I have painted: test subject. Please review.",
+        max_turns=rounds * 2,
+        silent=True,
     )
     return result, canvas, tools
+
+
+class TestArchitectureAcceptance:
+    """Invariants of the three-agent architecture with Painter as tool executor."""
+
+    def test_setup_pipeline_returns_painter_executor(self, tmp_output_dir, api_url_env):
+        painter, painter_executor, critic, canvas, tools, tracker = setup_pipeline(
+            "x", rounds=1, output_dir=str(tmp_output_dir)
+        )
+
+        assert isinstance(painter_executor, ConversableAgent)
+        assert painter_executor is not painter
+        assert painter_executor is not critic
+
+    def test_setup_pipeline_critic_has_no_drawing_tools(
+        self, tmp_output_dir, api_url_env
+    ):
+        _, _, critic, _, _, _ = setup_pipeline(
+            "x", rounds=1, output_dir=str(tmp_output_dir)
+        )
+
+        assert critic.function_map == {}
+
+    def test_setup_pipeline_painter_executor_has_drawing_tools(
+        self, tmp_output_dir, api_url_env
+    ):
+        _, painter_executor, _, _, tools, _ = setup_pipeline(
+            "x", rounds=1, output_dir=str(tmp_output_dir)
+        )
+
+        assert set(painter_executor.function_map.keys()) == set(tools.keys())
 
 
 class TestPipelineAcceptance:
@@ -181,7 +237,8 @@ class TestPipelineAcceptance:
             str(tmp_output_dir), rounds=3, painter_reply_factory=capturing_factory
         )
 
-        # Round 2+ messages should contain Critic's feedback text
+        # captured[0] is Phase 1 (executor prompt). captured[1]+ are Phase 2 rounds
+        # where painter receives critic feedback.
         assert len(captured) >= 2
         all_text = ""
         for msg in captured[1]:
@@ -203,14 +260,15 @@ class TestPipelineSlowAcceptance:
 
         load_dotenv()
 
-        from painter_critic.main import run_pipeline
+        from painter_critic.main import run_pipeline, save_conversation_log
 
         output_dir = tmp_path_factory.mktemp("slow_output")
-        run_pipeline(
+        result = run_pipeline(
             prompt="a red circle on blue background",
             rounds=2,
             output_dir=str(output_dir),
         )
+        save_conversation_log(result.chat_history, str(output_dir))
         return output_dir
 
     def test_pipeline_real_api_two_rounds_produces_images(self, real_pipeline_output):
@@ -220,3 +278,17 @@ class TestPipelineSlowAcceptance:
     def test_pipeline_real_api_output_images_are_200x200(self, real_pipeline_output):
         img = Image.open(real_pipeline_output / "round_01.png")
         assert img.size == (200, 200)
+
+    def test_pipeline_real_api_log_has_no_unknown_labels(self, real_pipeline_output):
+        """With nested-chat isolation, outer chat_history should not contain
+        unlabeled tool_call messages (which AG2 serializes as `--- Unknown ---`)."""
+        content = (real_pipeline_output / "conversation.log").read_text()
+        assert "--- Unknown ---" not in content
+
+    def test_pipeline_real_api_log_only_painter_and_critic(self, real_pipeline_output):
+        """Outer chat is Painter↔Critic only. Tool execution lives in nested chat."""
+        content = (real_pipeline_output / "conversation.log").read_text()
+        headers = {line for line in content.splitlines() if line.startswith("--- ")}
+        assert headers <= {"--- Painter ---", "--- Critic ---"}, (
+            f"Unexpected labels: {headers - {'--- Painter ---', '--- Critic ---'}}"
+        )

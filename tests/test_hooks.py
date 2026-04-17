@@ -111,7 +111,7 @@ class TestSendHookUnit:
         hook = create_send_hook(canvas)
         msg = {"content": "Hello", "role": "user"}
 
-        result = hook("painter", msg, "critic", False)
+        result = hook("painter", msg, "Critic", False)
 
         assert isinstance(result["content"], list)
 
@@ -120,7 +120,7 @@ class TestSendHookUnit:
         hook = create_send_hook(canvas)
         msg = {"content": "Hello", "role": "user"}
 
-        result = hook("painter", msg, "critic", False)
+        result = hook("painter", msg, "Critic", False)
 
         assert result["role"] == "user"
 
@@ -129,7 +129,7 @@ class TestSendHookUnit:
         hook = create_send_hook(canvas)
         msg = {"content": "Hello", "role": "assistant", "name": "painter"}
 
-        result = hook("painter", msg, "critic", False)
+        result = hook("painter", msg, "Critic", False)
 
         assert result["name"] == "painter"
 
@@ -140,7 +140,7 @@ class TestSendHookUnit:
         hook = create_send_hook(canvas)
         msg = {"content": "call", "tool_calls": [{"id": "1"}]}
 
-        result = hook("painter", msg, "critic", False)
+        result = hook("painter", msg, "Critic", False)
 
         assert result == msg
 
@@ -151,7 +151,7 @@ class TestSendHookUnit:
         hook = create_send_hook(canvas)
         msg = {"content": "result", "role": "tool"}
 
-        result = hook("painter", msg, "critic", False)
+        result = hook("painter", msg, "Critic", False)
 
         assert result == msg
 
@@ -185,7 +185,7 @@ class TestSendHookUnit:
         hook = create_send_hook(canvas)
         msg = {"content": [{"type": "text", "text": "existing"}]}
 
-        result = hook("painter", msg, "critic", False)
+        result = hook("painter", msg, "Critic", False)
 
         assert len(result["content"]) == 2
         assert result["content"][0] == {"type": "text", "text": "existing"}
@@ -199,7 +199,7 @@ class TestSendHookUnit:
         msg = {"content": "Hello", "role": "user"}
         original = copy.deepcopy(msg)
 
-        hook("painter", msg, "critic", False)
+        hook("painter", msg, "Critic", False)
 
         assert msg == original
 
@@ -351,7 +351,7 @@ class TestSaveHookUnit:
         hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
         msg = {"content": "Nice painting", "role": "assistant"}
 
-        hook("painter", msg, "critic", False)
+        hook("painter", msg, "Critic", False)
 
         expected_path = tmp_output_dir / "round_01.png"
         assert expected_path.exists()
@@ -364,7 +364,7 @@ class TestSaveHookUnit:
         hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
         msg = {"content": "Nice painting", "role": "assistant"}
 
-        hook("painter", msg, "critic", False)
+        hook("painter", msg, "Critic", False)
 
         assert tracker.current_round == 2
 
@@ -376,7 +376,7 @@ class TestSaveHookUnit:
         hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
         msg = {"content": "Nice painting", "role": "assistant"}
 
-        result = hook("painter", msg, "critic", False)
+        result = hook("painter", msg, "Critic", False)
 
         assert result is msg
 
@@ -390,8 +390,8 @@ class TestSaveHookUnit:
         hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
         msg = {"content": "text", "role": "assistant"}
 
-        hook("painter", msg, "critic", False)
-        hook("painter", msg, "critic", False)
+        hook("painter", msg, "Critic", False)
+        hook("painter", msg, "Critic", False)
 
         assert (tmp_output_dir / "round_01.png").exists()
         assert (tmp_output_dir / "round_02.png").exists()
@@ -404,7 +404,7 @@ class TestSaveHookUnit:
         hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
         msg = {"content": "call", "tool_calls": [{"id": "1"}]}
 
-        result = hook("painter", msg, "critic", False)
+        result = hook("painter", msg, "Critic", False)
 
         assert not tmp_output_dir.exists()
         assert tracker.current_round == 1
@@ -418,7 +418,7 @@ class TestSaveHookUnit:
         hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
         msg = {"content": "result", "role": "tool"}
 
-        result = hook("painter", msg, "critic", False)
+        result = hook("painter", msg, "Critic", False)
 
         assert not tmp_output_dir.exists()
         assert tracker.current_round == 1
@@ -432,7 +432,7 @@ class TestSaveHookUnit:
         hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
         msg = {"content": "text", "role": "assistant"}
 
-        hook("painter", msg, "critic", False)
+        hook("painter", msg, "Critic", False)
 
         saved = tmp_output_dir / "round_01.png"
         with open(saved, "rb") as f:
@@ -446,8 +446,26 @@ class TestSaveHookUnit:
         tracker = RoundTracker()
         hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
 
-        result = hook("painter", "done drawing", "critic", False)
+        result = hook("painter", "done drawing", "Critic", False)
 
         assert (tmp_output_dir / "round_01.png").exists()
         assert tracker.current_round == 2
         assert result == "done drawing"
+
+    # -- Guard: recipient is Agent instance with .name --
+
+    def test_save_hook_agent_object_as_recipient_saves_file(self, tmp_output_dir):
+        """Hook must handle real AG2 Agent instances (have .name) as recipient."""
+
+        class _FakeAgent:
+            def __init__(self, name):
+                self.name = name
+
+        canvas = Canvas()
+        tracker = RoundTracker()
+        hook = create_save_hook(canvas, tracker, str(tmp_output_dir))
+        msg = {"content": "text", "role": "assistant"}
+
+        hook("painter", msg, _FakeAgent("Critic"), False)
+
+        assert (tmp_output_dir / "round_01.png").exists()
