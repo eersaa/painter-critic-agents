@@ -486,7 +486,10 @@ class TestStripAssistantImagesHookUnit:
         image = canvas.to_image_content()
         hook = create_strip_assistant_images_hook()
         messages = [
-            {"role": "assistant", "content": [{"type": "text", "text": "reply"}, image]},
+            {
+                "role": "assistant",
+                "content": [{"type": "text", "text": "reply"}, image],
+            },
         ]
 
         result = hook(messages)

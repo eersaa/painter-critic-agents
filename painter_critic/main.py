@@ -15,10 +15,11 @@ from painter_critic.config import (
 )
 from painter_critic.hooks import (
     RoundTracker,
+    create_prune_stale_user_images_hook,
     create_reply_hook,
     create_save_hook,
     create_send_hook,
-    create_strip_images_hook,
+    create_strip_assistant_images_hook,
 )
 from painter_critic.tools import create_tools
 
@@ -100,11 +101,23 @@ def setup_pipeline(
 
     tracker = RoundTracker()
     critic.register_hook("process_message_before_send", create_send_hook(canvas))
-    # Strip images from assistant messages before Critic's LLM (some models reject them)
+    # Strip assistant images (API compliance) + prune stale user images + inject current canvas
     critic.register_hook(
-        "process_all_messages_before_reply", create_strip_images_hook()
+        "process_all_messages_before_reply", create_strip_assistant_images_hook()
+    )
+    critic.register_hook(
+        "process_all_messages_before_reply", create_prune_stale_user_images_hook()
     )
     critic.register_hook("process_all_messages_before_reply", create_reply_hook(canvas))
+    painter.register_hook(
+        "process_all_messages_before_reply", create_strip_assistant_images_hook()
+    )
+    painter.register_hook(
+        "process_all_messages_before_reply", create_prune_stale_user_images_hook()
+    )
+    painter.register_hook(
+        "process_all_messages_before_reply", create_reply_hook(canvas)
+    )
     painter.register_hook(
         "process_message_before_send", create_save_hook(canvas, tracker, output_dir)
     )

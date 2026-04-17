@@ -70,25 +70,57 @@ def create_save_hook(
     return hook
 
 
-def create_strip_images_hook() -> Callable:
-    """Strip image_url blocks from assistant messages before LLM call.
+def _strip_images(msg: dict) -> dict:
+    """Return a copy of msg with image_url blocks removed from its content list."""
+    stripped = dict(msg)
+    stripped["content"] = [b for b in msg["content"] if b.get("type") != "image_url"]
+    return stripped
 
-    Some models reject images in assistant-role messages. This hook removes
-    them so only user-role messages contain images.
+
+def create_strip_assistant_images_hook() -> Callable:
+    """Strip image_url blocks from every assistant message.
+
+    Reason: API compliance — OpenAI/Anthropic chat APIs reject images in assistant turns.
     """
 
     def hook(messages: list[dict]) -> list[dict]:
-        result = []
-        for msg in messages:
-            if msg.get("role") == "assistant" and isinstance(msg.get("content"), list):
-                msg_copy = dict(msg)
-                msg_copy["content"] = [
-                    b for b in msg["content"] if b.get("type") != "image_url"
-                ]
-                result.append(msg_copy)
-            else:
-                result.append(msg)
-        return result
+        return [
+            _strip_images(msg)
+            if msg.get("role") == "assistant" and isinstance(msg.get("content"), list)
+            else msg
+            for msg in messages
+        ]
+
+    return hook
+
+
+def create_prune_stale_user_images_hook() -> Callable:
+    """Strip image_url blocks from every user message except the last one.
+
+    Reason: preventing stale canvas accumulation across rounds — reply_hook
+    re-attaches the current canvas to the last message.
+    """
+
+    def hook(messages: list[dict]) -> list[dict]:
+        last_user_idx = next(
+            (
+                i
+                for i in range(len(messages) - 1, -1, -1)
+                if messages[i].get("role") == "user"
+            ),
+            None,
+        )
+
+        return [
+            msg
+            if not (
+                msg.get("role") == "user"
+                and isinstance(msg.get("content"), list)
+                and i != last_user_idx
+            )
+            else _strip_images(msg)
+            for i, msg in enumerate(messages)
+        ]
 
     return hook
 
