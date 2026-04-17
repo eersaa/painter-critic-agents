@@ -13,7 +13,9 @@ Three agents, two-phase flow:
 - **Critic** (LLM) — visually evaluates canvas, returns structured feedback.
 
 Phase 1 (pre-draw): `PainterExecutor.initiate_chat()` → Painter nested LLM↔tool loop for first attempt.
-Phase 2 (critique loop): `Painter.initiate_chat(Critic)` with `max_turns = rounds * 2`.
+Phase 2 (critique loop): `Painter.initiate_chat(Critic)` with `max_turns=rounds`.
+
+Pre-reply hook order on both agents (load-bearing): `strip_assistant_images` → `prune_stale_user_images` → `reply_hook`. Reply must run last so the injected current canvas survives pruning.
 
 Key modules (under `painter_critic/`):
 

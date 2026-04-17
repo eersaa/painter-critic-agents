@@ -33,11 +33,10 @@
     critic_model=DEFAULT_CRITIC_MODEL,
 ):`
 - [x] Decouple `MAX_TOOL_ITERATIONS` from hand-off signal: added `is_termination_msg` on `PainterExecutor` (receiver-side per AG2 docs) that terminates on text-only replies; rewrote Painter prompt step 5 to require end-of-turn text summary. Works uniformly in Phase 1 and Phase 2 nested chat; `summary_method="last_msg"` forwards the summary to Critic. Cap is now pure safety.
+- [x] Fix quality degradation across rounds: split `create_strip_images_hook` into `create_strip_assistant_images_hook` (API compliance) + `create_prune_stale_user_images_hook` (prevents stale canvas accumulation). Registered strip→prune→reply chain on both Painter and Critic. Reworded Phase-2 opener to "Please critique the canvas." Rewrote Critic rule 2 to use named regions / shape anchors instead of pixel coordinates; dropped tool-prescription negation. 3-round end-to-end run shows monotonic detail gain and zero `(x, y)` pairs in Critic output.
 
 ## Todo
 
-- One issue is that the picture gets worse and worse over the conversation so I don't know what are the ways to address that I would make sure that the critique really sees the picture and the painter also sees and understands the picture
- and what to draw and I don't know are those exact pixel points from the critique agent confusing for the painter
 - The conversation log isn't most readable for the user. And same applies to the output what user gets to the terminal.
 - It seems that there is some difference how the model wants to get the tools because with default models there is no this error but when I use the Qwen model for the painter I will get this error that the tools are listed in wrong kind of data structure.
   - `>>>>>>>> EXECUTED FUNCTION draw_polygon...
@@ -94,3 +93,7 @@ points.11
 - Rename `"TERMINATE"` in `_executor_mock` — `max_turns` handles termination now; the literal is misleading to readers
 - Add unit test asserting Phase 1 `clear_history=True` is passed to `initiate_chat` (matters for repeatable runs)
 - If `setup_pipeline` grows further, split into `_wire_tools` / `_wire_nested_chat` / `_wire_hooks`
+- Add explicit prune-hook test for interleaved user/assistant/user case (exercises `last_user_idx` reverse scan when non-user messages follow the last user)
+- Add negative ordering test: register reply before prune, assert canvas gets pruned (would have caught ordering-drift on a subtle refactor)
+- `_phase1_message` attaches the blank canvas explicitly even though Painter's `reply_hook` will also attach it — two identical image blocks on turn 1. Harmless but wasted tokens; consider dropping the explicit attachment in `_phase1_message`
+- Consider `wire_canvas_agent(agent, canvas, *, sends_canvas: bool)` helper if a third canvas-aware agent appears (currently 6 `register_hook` calls × 2 agents = tolerable duplication, extracting now would hide load-bearing order)
