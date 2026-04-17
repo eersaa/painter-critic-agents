@@ -71,3 +71,37 @@ class TestAgentsAcceptance:
         _, painter_executor, _ = create_agents("a red circle")
 
         assert not painter_executor.llm_config
+
+    def test_painter_executor_terminates_on_text_only_reply(self, api_url_env):
+        _, painter_executor, _ = create_agents("a red circle")
+
+        assert painter_executor._is_termination_msg(
+            {"content": "round done, over to critic", "role": "assistant"}
+        )
+
+    def test_painter_executor_continues_on_tool_call_reply(self, api_url_env):
+        _, painter_executor, _ = create_agents("a red circle")
+
+        assert not painter_executor._is_termination_msg(
+            {
+                "tool_calls": [{"id": "x", "function": {"name": "draw_rectangle"}}],
+                "role": "assistant",
+            }
+        )
+
+    def test_painter_executor_terminates_on_empty_tool_calls_list(self, api_url_env):
+        """Edge case: empty list is falsy — our check treats missing-or-empty
+        tool_calls as text-only and terminates. AG2 never sends tool_calls=[]
+        in practice, but the contract should be explicit."""
+        _, painter_executor, _ = create_agents("a red circle")
+
+        assert painter_executor._is_termination_msg(
+            {"tool_calls": [], "content": "text", "role": "assistant"}
+        )
+
+    def test_painter_system_message_instructs_end_of_turn_summary(self, api_url_env):
+        """Painter must emit a short text summary after drawing to hand off to
+        Critic. This signal triggers PainterExecutor.is_termination_msg."""
+        painter, _, _ = create_agents("a red circle")
+
+        assert "summar" in painter.system_message.lower()
