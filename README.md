@@ -50,19 +50,41 @@ output/
 
 ## Design Decisions
 
-### Architecture Pattern: Two-Agent Chat
+### Architecture: From Two Agents to Three
 
-The system uses AG2's `initiate_chat` to orchestrate a direct two-agent conversation between the Critic (initiator) and Painter (recipient). This is the simplest AG2-native pattern that satisfies the round structure: the Critic sends feedback with the canvas image, the Painter responds by calling drawing tools, and the cycle repeats.
+**Initial approach — two-agent direct chat.** The first design used AG2's simplest pattern: `Critic.initiate_chat(Painter, …)`, with drawing tools registered as `register_for_llm(painter)` + `register_for_execution(critic)`. Reasoning: AG2 dispatches tool_calls to the *receiver* of a two-agent chat, so colocating execution on the Critic was the mechanically simplest way to get tools to run in the default topology. GroupChat and nested chats were rejected as overcomplicated for a two-party interaction.
 
-Alternatives considered and rejected:
-- **GroupChat (3+ agents)**: Would add a separate tool executor agent. Rejected because it introduces unnecessary complexity in speaker selection and turn ordering for what is fundamentally a two-party interaction.
-- **Nested chats**: Would have an orchestrator trigger separate sub-conversations with Painter and Critic. Rejected because it overcomplicates the simple back-and-forth and makes message/image passing between agents harder to manage.
+**Why we pivoted.** The two-agent design was mechanically working but semantically inverted: the Critic literally executed every `draw_*` call, conversation logs attributed tool results to the Critic, and the Painter emitted tool_call JSON without ever touching the canvas. Role inversion broke cohesion — "Critic reviews" and "Critic draws" collapsed into one agent. Fulfilling the assignment's intent (Painter paints, Critic critiques) required the Painter to be the one drawing. AG2's tool-calling framework requires caller and executor to be **distinct** `ConversableAgent` instances, so "Painter draws" cannot be satisfied by a single agent in the original topology.
 
-The Critic acts as both the visual evaluator (via its LLM) and the tool executor (via AG2's caller/executor registration pattern). This is idiomatic AG2 -- the agent that receives tool calls executes them.
+**Current design — three agents, two phases.** Behind a single user-facing Painter identity:
+
+- **Painter** (LLM) — issues tool_calls; sees canvas via hook.
+- **PainterExecutor** (no LLM) — runs the drawing functions. Internal helper; not surfaced in the outer conversation log.
+- **Critic** (LLM) — unchanged role; visually evaluates.
+
+Two-phase flow:
+
+```
+Phase 1 (pre-draw):
+  PainterExecutor.initiate_chat(Painter, message=<text "Paint: X" + blank canvas>)
+    → Painter LLM ↔ PainterExecutor tool loop until Painter replies in text
+
+Phase 2 (critique loop, `rounds` iterations, max_turns = rounds * 2):
+  Painter.initiate_chat(Critic, message=<"I have painted: X. Please review.">)
+  Each round:
+    Painter  ──(text summary + canvas via send_hook)─▶  Critic
+    Critic   ──(structured feedback + canvas)───────▶  Painter
+             └─ triggers nested chat: PainterExecutor ↔ Painter tool loop;
+                Painter's final text summary becomes its reply to Critic
+```
+
+The nested tool loop is wired via `painter.register_nested_chats(trigger=critic, chat_queue=[{sender: painter_executor, recipient: painter, message: _nested_chat_message, …}])`. The outer `conversation.log` therefore shows only Painter ↔ Critic messages; internal tool traffic stays out. Painter-initiates direction matches the natural creative flow (user prompt → Painter paints → hands off to Critic for review).
 
 ### Round Control
 
-A "round" is one Painter draw + one Critic review. Tool execution in AG2 consumes extra turns within `initiate_chat`, so `max_turns` alone cannot control the number of painting rounds. Instead, termination is driven by `RoundTracker`: after the Painter's `process_message_before_send` hook saves a snapshot and increments the round counter, `painter._is_termination_msg` checks whether `tracker.current_round > rounds`. `max_turns=rounds*4` serves as an upper-bound safety net.
+A "round" = one Painter summary sent to Critic + one Critic feedback reply. Phase 2's `max_turns = rounds * 2` bounds the outer chat. Per-round internal tool iterations inside the nested chat are bounded separately by `MAX_TOOL_ITERATIONS = 8` (defined in `config.py`). `RoundTracker` increments on each Painter→Critic send (via `create_save_hook`) and produces the `round_NN.png` filenames. There is no custom `_is_termination_msg` — an earlier version used one to guard round count, but AG2 invokes it on *incoming* messages, which briefly killed both phases (Phase 1 terminated on the "Paint: X" message arriving; Phase 2 terminated on the first Critic feedback). `max_turns` alone is sufficient once the counts are set correctly.
+
+Phase 1 pre-draw is capped separately by `max_turns = MAX_TOOL_ITERATIONS` and terminates naturally when Painter emits a text reply (no tool_calls): PainterExecutor has no LLM, so a text reply breaks the loop.
 
 ### Model Choice
 
@@ -98,6 +120,8 @@ Both agents see the actual canvas image using base64-encoded PNGs in OpenAI's vi
 
 - **`create_save_hook`** (`process_message_before_send`) — saves a PNG snapshot of the canvas after each Painter reply and increments the `RoundTracker`. Skips tool-execution messages.
 
+**Nested-chat message callable.** When Critic's `send_hook` wraps feedback content as a multimodal list (`[{type: text}, {type: image_url}]`), AG2's default nested-chat machinery forwards that bare list directly to the inner `initiate_chat`, which then fails `_message_to_dict` validation. A small `_nested_chat_message` callable registered on the `chat_queue` wraps list content as `{"content": list}` before it reaches the nested chat, preserving the multimodal payload intact.
+
 ### Module Structure
 
 The system is decomposed into six modules with clear separation of concerns:
@@ -120,7 +144,7 @@ Canvas ──┬── Tools ──────┼── Agents ── Main
          └── Hooks ──────┘
 ```
 
-This decomposition allows each module to be tested independently without LLM calls.
+This decomposition allows each module to be tested independently without LLM calls. `main.py` orchestrates the two-phase pipeline: Phase 1 pre-draw via `painter_executor.initiate_chat(painter, _phase1_message(prompt, canvas))`, Phase 2 critique loop via `painter.initiate_chat(critic, …, max_turns=rounds*2)`. It also owns the `_nested_chat_message` wiring helper and the `save_conversation_log` writer.
 
 ## Observations
 
@@ -138,6 +162,8 @@ Results from a 10-round run with prompt "a house with a sun and trees":
 **Model observations:**
 - `openai/gpt-4.1-mini` (Painter) showed solid spatial reasoning, correctly interpreting relative positioning feedback and mapping it to pixel coordinates on the 200x200 canvas.
 - `qwen/qwen3.5-flash-02-23` (Critic) provided detailed, well-structured visual feedback with clear priorities. Its vision capability accurately identified shape positioning issues (e.g., "the door looks like two separate rectangles").
+
+*(Note: the "Excellent!" devolution described above motivated the subsequent Critic system-message rewrite, which now forbids declaring the work "done/excellent/complete/perfect" and requires 3–5 specific suggestions per round. A re-benchmark on the updated prompts has not yet been run.)*
 
 ## Running Tests
 
