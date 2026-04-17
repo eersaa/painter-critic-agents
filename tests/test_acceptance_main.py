@@ -133,7 +133,6 @@ class TestArchitectureAcceptance:
         assert set(painter_executor.function_map.keys()) == set(tools.keys())
 
 
-
 class TestPipelineAcceptance:
     def test_pipeline_n_rounds_produces_n_images(self, tmp_output_dir, api_url_env):
         rounds = 3
