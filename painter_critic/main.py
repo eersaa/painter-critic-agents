@@ -71,8 +71,8 @@ def setup_pipeline(
         trigger=critic,
         chat_queue=[
             {
-                "recipient": painter_executor,
-                "sender": painter,
+                "sender": painter_executor,
+                "recipient": painter,
                 "max_turns": MAX_TOOL_ITERATIONS,
                 "summary_method": "last_msg",
             }
@@ -107,7 +107,12 @@ def run_pipeline(
     # Phase 1: pre-draw. Executor kicks off Painter's LLM↔tool loop to produce first attempt.
     painter_executor.initiate_chat(
         painter,
-        message=f"Paint: {prompt}",
+        message={
+            "content": [
+                {"type": "text", "text": f"Paint: {prompt}"},
+                canvas.to_image_content(),
+            ]
+        },
         max_turns=MAX_TOOL_ITERATIONS,
         clear_history=True,
     )
