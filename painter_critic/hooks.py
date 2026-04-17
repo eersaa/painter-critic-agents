@@ -58,6 +58,9 @@ def create_save_hook(
     canvas: Canvas, tracker: RoundTracker, output_dir: str
 ) -> Callable:
     def hook(sender, message, recipient, silent):
+        recipient_name = getattr(recipient, "name", recipient)
+        if recipient_name != "Critic":
+            return message
         if _is_tool_message(message):
             return message
         canvas.save(tracker.get_image_path(output_dir))

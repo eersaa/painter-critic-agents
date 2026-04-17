@@ -4,6 +4,7 @@ import os
 CANVAS_SIZE = 200
 DEFAULT_ROUNDS = 10
 OUTPUT_DIR = "output"
+MAX_TOOL_ITERATIONS = 8
 DEFAULT_PAINTER_MODEL = "openai/gpt-4.1-mini"
 DEFAULT_CRITIC_MODEL = "qwen/qwen3.5-flash-02-23"
 

@@ -9,6 +9,7 @@ from painter_critic.config import (
     DEFAULT_CRITIC_MODEL,
     DEFAULT_PAINTER_MODEL,
     DEFAULT_ROUNDS,
+    MAX_TOOL_ITERATIONS,
     OUTPUT_DIR,
     parse_args,
 )
@@ -54,15 +55,27 @@ def setup_pipeline(
     painter_model=DEFAULT_PAINTER_MODEL,
     critic_model=DEFAULT_CRITIC_MODEL,
 ):
-    """Create and wire all components. Returns (painter, critic, canvas, tools, tracker)."""
+    """Create and wire all components. Returns (painter, painter_executor, critic, canvas, tools, tracker)."""
     canvas = Canvas(CANVAS_SIZE, CANVAS_SIZE)
     tools = create_tools(canvas)
-    painter, critic = create_agents(prompt, painter_model, critic_model, CANVAS_SIZE)
+    painter, painter_executor, critic = create_agents(
+        prompt, painter_model, critic_model, CANVAS_SIZE
+    )
 
-    # Painter LLM generates tool calls; Critic executes them (AG2 receiver pattern)
+    # Painter LLM generates tool calls; PainterExecutor executes them
     for func in tools.values():
         painter.register_for_llm(description=func.__doc__)(func)
-        critic.register_for_execution()(func)
+        painter_executor.register_for_execution()(func)
+
+    painter.register_nested_chats(
+        trigger=critic,
+        chat_queue=[{
+            "recipient": painter_executor,
+            "sender": painter,
+            "max_turns": MAX_TOOL_ITERATIONS,
+            "summary_method": "last_msg",
+        }],
+    )
 
     tracker = RoundTracker()
     critic.register_hook("process_message_before_send", create_send_hook(canvas))
@@ -78,7 +91,7 @@ def setup_pipeline(
     # Terminate after target rounds (checked on Painter's replies by initiate_chat)
     painter._is_termination_msg = lambda msg: tracker.current_round > rounds
 
-    return painter, critic, canvas, tools, tracker
+    return painter, painter_executor, critic, canvas, tools, tracker
 
 
 def run_pipeline(
@@ -88,7 +101,7 @@ def run_pipeline(
     painter_model=DEFAULT_PAINTER_MODEL,
     critic_model=DEFAULT_CRITIC_MODEL,
 ):
-    painter, critic, canvas, tools, tracker = setup_pipeline(
+    painter, painter_executor, critic, canvas, tools, tracker = setup_pipeline(
         prompt, rounds, output_dir, painter_model, critic_model
     )
     # Upper bound: 4 turns per round (tool call + tool result + text + feedback)
