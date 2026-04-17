@@ -3,6 +3,8 @@
 RED phase: these tests define expected behavior before implementation exists.
 """
 
+from unittest.mock import patch
+
 
 class TestSaveConversationLogUnit:
     """Unit tests for save_conversation_log(chat_history, output_dir)."""
@@ -175,3 +177,49 @@ class TestSaveConversationLogUnit:
         # Both text blocks should be joined in the output
         assert "First thought." in content
         assert "Second thought." in content
+
+
+class _FakeChatResult:
+    """Minimal stand-in for autogen ChatResult."""
+
+    def __init__(self):
+        self.chat_history = []
+
+
+class TestRunPipelinePhase1Message:
+    """run_pipeline must send a multimodal message (text + canvas image)
+    to the Painter in Phase 1 so the LLM can examine the canvas before
+    issuing tool calls.
+    """
+
+    def test_run_pipeline_phase1_message_is_multimodal(self, api_url_env):
+        from painter_critic import main as main_module
+
+        captured = []
+
+        def fake_initiate_chat(self, recipient, *args, **kwargs):
+            captured.append({"sender": self, "recipient": recipient, "kwargs": kwargs})
+            return _FakeChatResult()
+
+        with patch(
+            "autogen.ConversableAgent.initiate_chat",
+            new=fake_initiate_chat,
+        ):
+            main_module.run_pipeline("a red square", rounds=1)
+
+        assert captured, "expected initiate_chat to be called"
+        phase1 = captured[0]
+        message = phase1["kwargs"].get("message")
+
+        assert isinstance(message, dict), (
+            f"Phase 1 message must be a dict with 'content' list, got: {type(message).__name__}"
+        )
+        content = message.get("content")
+        assert isinstance(content, list), (
+            f"Phase 1 message['content'] must be a list, got: {type(content).__name__}"
+        )
+
+        types = [block.get("type") for block in content if isinstance(block, dict)]
+        assert "image_url" in types, (
+            f"Phase 1 message must include an image_url block; got types: {types}"
+        )
