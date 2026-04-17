@@ -13,9 +13,9 @@ def create_agents(
     painter_model: str = DEFAULT_PAINTER_MODEL,
     critic_model: str = DEFAULT_CRITIC_MODEL,
     canvas_size: int = CANVAS_SIZE,
-) -> tuple[ConversableAgent, ConversableAgent]:
-    """Create Painter + Critic agents with system messages and LLM configs.
-    Returns (painter, critic). No tool or hook wiring — that's main.py's job.
+) -> tuple[ConversableAgent, ConversableAgent, ConversableAgent]:
+    """Create Painter + PainterExecutor + Critic agents with system messages and LLM configs.
+    Returns (painter, painter_executor, critic). No tool or hook wiring — that's main.py's job.
     """
     painter_system_message = (
         f"You are a Painter agent. Your task is to draw: {subject}.\n"
@@ -41,6 +41,14 @@ def create_agents(
         code_execution_config=False,
     )
 
+    painter_executor = ConversableAgent(
+        name="PainterExecutor",
+        system_message="Internal tool executor for Painter. Executes drawing functions; produces no commentary.",
+        llm_config=False,
+        human_input_mode="NEVER",
+        code_execution_config=False,
+    )
+
     critic = ConversableAgent(
         name="Critic",
         system_message=critic_system_message,
@@ -49,4 +57,4 @@ def create_agents(
         code_execution_config=False,
     )
 
-    return painter, critic
+    return painter, painter_executor, critic
