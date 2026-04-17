@@ -77,8 +77,17 @@ def _run_mocked_pipeline(output_dir, rounds=3, painter_reply_factory=None):
 
     # Phase 1: pre-draw. Executor kicks off, Painter mock replies once (draws).
     # max_turns=2 → executor initial msg + painter reply; no save (recipient is not Critic).
+    # Multimodal message mirrors run_pipeline: Painter needs a canvas image to know what to draw.
     painter_executor.initiate_chat(
-        painter, message="Paint: test subject", max_turns=2, silent=True
+        painter,
+        message={
+            "content": [
+                {"type": "text", "text": "Paint: test subject"},
+                canvas.to_image_content(),
+            ]
+        },
+        max_turns=2,
+        silent=True,
     )
 
     # Phase 2: critique loop. Painter initiates with Critic.
@@ -123,6 +132,28 @@ class TestArchitectureAcceptance:
 
         assert set(painter_executor.function_map.keys()) == set(tools.keys())
 
+    def test_setup_pipeline_termination_ignores_non_empty_content(
+        self, tmp_output_dir, api_url_env
+    ):
+        """Termination must be driven by round count only, not message content.
+
+        Bug: _is_termination_msg fired on any non-empty content, killing Phase 1
+        (on 'Paint: X' arriving) and Phase 2 (on Critic feedback arriving).
+        """
+        painter, _, _, _, _, tracker = setup_pipeline(
+            "x", rounds=2, output_dir=str(tmp_output_dir)
+        )
+
+        # Critic feedback while still within target rounds must NOT terminate
+        assert not painter._is_termination_msg(
+            {"content": "Add more red to the painting."}
+        )
+
+        # After exceeding target rounds — must terminate regardless of content
+        tracker.increment()  # round 2
+        tracker.increment()  # round 3 > rounds=2
+        assert painter._is_termination_msg({"content": "Looks good!"})
+
 
 class TestPipelineAcceptance:
     def test_pipeline_n_rounds_produces_n_images(self, tmp_output_dir, api_url_env):
@@ -154,6 +185,41 @@ class TestPipelineAcceptance:
         # Round 1 mock draws red rectangle at (10,10)-(80,80); pixel (50,50) should be red
         pixel = img.getpixel((50, 50))
         assert pixel[0] > 200, f"Red channel {pixel[0]} too low — round 1 drawing lost"
+
+    def test_pipeline_phase1_message_includes_canvas_image(
+        self, tmp_output_dir, api_url_env
+    ):
+        """Phase 1 initial message to Painter must include the canvas image.
+
+        Bug: run_pipeline sent plain text 'Paint: X'. Painter's system prompt says
+        'examine the attached canvas image' — without it, LLM replies with text
+        instead of calling drawing tools.
+        """
+        captured = []
+
+        def capturing_factory(tools):
+            def reply(recipient, messages=None, sender=None, config=None):
+                if messages:
+                    captured.append(list(messages))
+                tools["draw_rectangle"](10, 10, 80, 80, "#FF0000")
+                return (True, "Drew something")
+
+            return reply
+
+        _run_mocked_pipeline(
+            str(tmp_output_dir), rounds=1, painter_reply_factory=capturing_factory
+        )
+
+        # captured[0]: messages Painter sees in Phase 1 (executor's initial multimodal msg)
+        assert len(captured) >= 1
+        has_image = any(
+            isinstance(msg.get("content"), list)
+            and any(b.get("type") == "image_url" for b in msg["content"])
+            for msg in captured[0]
+        )
+        assert has_image, (
+            "Phase 1 message to Painter must contain a canvas image_url block"
+        )
 
     def test_pipeline_conversation_log_contains_agent_names(
         self, tmp_output_dir, api_url_env
@@ -237,11 +303,11 @@ class TestPipelineAcceptance:
             str(tmp_output_dir), rounds=3, painter_reply_factory=capturing_factory
         )
 
-        # captured[0] is Phase 1 (executor prompt). captured[1]+ are Phase 2 rounds
-        # where painter receives critic feedback.
-        assert len(captured) >= 2
+        # captured[0] = Phase 1. captured[1] = Phase 2 round 1 (Painter sends, no feedback yet).
+        # captured[2] = Phase 2 round 2, where message history includes Critic's first reply.
+        assert len(captured) >= 3
         all_text = ""
-        for msg in captured[1]:
+        for msg in captured[2]:
             content = msg.get("content", "")
             if isinstance(content, str):
                 all_text += content
