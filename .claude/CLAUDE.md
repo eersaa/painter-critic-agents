@@ -2,13 +2,36 @@
 
 ## Project Overview
 
+Multi-agent system built on AG2 (autogen). Painter agent draws on a 200×200 canvas via tool calls; Critic agent visually evaluates the PNG and sends feedback. Iterates for N rounds. Model and round count configurable via CLI. Outputs PNGs and conversation logs to `output/`.
 
 ## Architecture
 
+Three agents, two-phase flow:
+
+- **Painter** (LLM) — issues drawing tool calls; sees canvas image via hook.
+- **PainterExecutor** (non-LLM) — executes tools (AG2 tool-calling pattern).
+- **Critic** (LLM) — visually evaluates canvas, returns structured feedback.
+
+Phase 1 (pre-draw): `PainterExecutor.initiate_chat()` → Painter nested LLM↔tool loop for first attempt.
+Phase 2 (critique loop): `Painter.initiate_chat(Critic)` with `max_turns = rounds * 2`.
+
+Key modules (under `painter_critic/`):
+
+- [main.py](../painter_critic/main.py) — `setup_pipeline`, `run_pipeline`.
+- [agents.py](../painter_critic/agents.py) — `create_agents()` → (Painter, PainterExecutor, Critic).
+- [canvas.py](../painter_critic/canvas.py) — PIL wrapper, base64, PNG save.
+- [tools.py](../painter_critic/tools.py) — `draw_rectangle`/`circle`/`line`/`polygon`.
+- [hooks.py](../painter_critic/hooks.py) — `RoundTracker`, image injection/stripping.
+- [config.py](../painter_critic/config.py) — CLI args, LLM config.
 
 ## **Important** Development Workflow
 
 When you are creating a plan, implementing or fixing issue always use following approach:
+
+Throughout every step below:
+
+- **Surface assumptions / ask when unclear.** Don't silently pick between interpretations. If a simpler approach exists, say so. Stop and name confusion rather than guessing.
+- **Surgical changes.** Every changed line should trace to the request. Don't "improve" adjacent code, comments, or formatting. Match existing style. Remove only orphans your own change created; flag pre-existing dead code rather than deleting it.
 
 1. Make sure that ALL fast tests pass. Ask user what to do if they fail.
 2. Main agent writes or edits acceptance tests for the described behavior in the current session plan.
@@ -41,6 +64,13 @@ Read `.claude/rules/testing.md`
 
 ## Key Dependencies
 
+Runtime:
+
+- `ag2[openai]>=0.11.0`
+- `Pillow>=10.0.0`
+- `python-dotenv>=1.0.0`
+
+Dev: `pytest>=8.0`, `ruff>=0.4.0`. Python `>=3.13` (pinned via `mise`).
 
 ## Python
 

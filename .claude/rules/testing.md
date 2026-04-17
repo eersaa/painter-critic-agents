@@ -6,6 +6,12 @@
 - Test interface how the user would use it.
 - Test naming: `test_<component>_<scenario>_<expected_result>`
 
+## Running tests
+
+- Fast (default, excludes `slow`): `uv run pytest`
+- Slow / acceptance: `uv run pytest -m slow`
+- All: `uv run pytest -m "slow or not slow"`
+
 ## Good tests are...
 
 - Understandable - Tests should describe what they are testing to understand the goals of the software: Focused on the behaviour of the system, not a specific implementation
