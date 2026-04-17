@@ -125,9 +125,10 @@ class TestAgentsUnit:
         )
 
     def test_painter_prompt_old_forbidding_phrase_removed(self, api_url_env):
-        """The old phrase actively forbids text replies; it must be gone so
-        the new end-of-turn summary instruction is not contradicted."""
+        """The old wording coupled `keep improving` with `every round` in a way
+        that suppressed text replies mid-round. Check a whitespace-insensitive
+        fragment rather than the exact indented form."""
         painter, _, _ = create_agents("a red circle")
 
-        forbidden = "your job is\n     to keep improving it every round"
-        assert forbidden not in painter.system_message
+        collapsed = " ".join(painter.system_message.split()).lower()
+        assert "your job is to keep improving it every round" not in collapsed
