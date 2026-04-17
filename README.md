@@ -67,24 +67,46 @@ Two-phase flow:
 ```
 Phase 1 (pre-draw):
   PainterExecutor.initiate_chat(Painter, message=<text "Paint: X" + blank canvas>)
-    → Painter LLM ↔ PainterExecutor tool loop until Painter replies in text
+    → Painter LLM ↔ PainterExecutor tool loop until Painter replies text-only
+       (PainterExecutor.is_termination_msg fires on messages with no tool_calls)
 
-Phase 2 (critique loop, `rounds` iterations, max_turns = rounds * 2):
+Phase 2 (critique loop, `rounds` iterations, max_turns = rounds):
   Painter.initiate_chat(Critic, message=<"I have painted: X. Please review.">)
   Each round:
     Painter  ──(text summary + canvas via send_hook)─▶  Critic
     Critic   ──(structured feedback + canvas)───────▶  Painter
              └─ triggers nested chat: PainterExecutor ↔ Painter tool loop;
-                Painter's final text summary becomes its reply to Critic
+                terminates when Painter replies text-only; that text becomes
+                Painter's reply to Critic via summary_method="last_msg"
 ```
 
 The nested tool loop is wired via `painter.register_nested_chats(trigger=critic, chat_queue=[{sender: painter_executor, recipient: painter, message: _nested_chat_message, …}])`. The outer `conversation.log` therefore shows only Painter ↔ Critic messages; internal tool traffic stays out. Painter-initiates direction matches the natural creative flow (user prompt → Painter paints → hands off to Critic for review).
 
+### Decoupling the Safety Cap from the Hand-off Signal
+
+The three-agent flip fixed the role inversion but exposed a subtler knot. `MAX_TOOL_ITERATIONS` (in `config.py`) was meant as a safety cap on Painter's inner tool loop — a belt-and-suspenders ceiling so a runaway tool-calling LLM couldn't spin forever. In practice it was load-bearing as *something else entirely*: the de-facto signal for "this turn is done, hand off to the Critic."
+
+Why? The original Painter system prompt forbade stopping: *"Do not praise the image or declare it finished; your job is to keep improving it every round."* Painter, obediently, never emitted a text-only reply. PainterExecutor has no LLM and can't respond to text — the natural termination of a tool-executor agent — but that mechanism was never *triggered*, because Painter never offered text for the executor to fail to respond to. Instead the loop ran until `max_turns=MAX_TOOL_ITERATIONS` forcibly cut it off, and whatever Painter was midway through drawing got snapped to the Critic.
+
+That made the knob load-bearing in two incompatible ways. Raise it to give Painter more room per turn, and on complex prompts the whole pipeline could hit AG2's outer turn limit (a "photorealistic sports car" prompt hit `Maximum turns (40) reached`). Lower it, and Painter got cut off mid-composition.
+
+The fix has two coordinated parts:
+
+1. **An explicit termination contract on PainterExecutor.** Per [AG2's ending-a-chat docs](https://docs.ag2.ai/latest/docs/user-guide/advanced-concepts/orchestration/ending-a-chat/), `is_termination_msg` is evaluated on the *receiver* of each message. PainterExecutor is the receiver of every Painter reply in both phases (Phase 1 `initiate_chat` and Phase 2 nested chat). A single lambda — `lambda msg: not msg.get("tool_calls")` — covers both: when Painter's reply carries no tool_calls, the loop terminates. Same rule, both phases, no duplicate wiring.
+
+2. **A Painter prompt that actually uses the signal.** Step 5 now reads: *"After your tool calls, end each turn with one short plain-text summary of what changed this turn to hand off to the Critic. Never declare the overall work done, perfect, or finished — keep improving across rounds."* The overall-work restriction stays (Painter doesn't get to declare victory); only the per-turn text reply is now required, and it carries the hand-off payload.
+
+Together, these restore `MAX_TOOL_ITERATIONS` to its intended role as a pure safety cap. The normal path terminates at Painter's text summary after typically 1–2 tool-call batches; the cap catches only pathological loops the prompt didn't prevent.
+
+**Phase 2 hand-off to Critic comes for free.** The nested chat entry already had `summary_method="last_msg"`, which AG2 uses to forward the nested chat's final message as the outer-chat reply. The final message is now guaranteed to be Painter's text summary, so Critic literally reads Painter's hand-off sentence as its next incoming message — no extra wiring, no extra LLM round-trip, no reflection step.
+
+An earlier `is_termination_msg` attempt during the two-agent era was reverted because it was placed on the Painter (the sender, not the receiver) and used a round counter rather than a per-message predicate; the receiver-side `tool_calls` check and the three-agent topology make the contract clean this time.
+
 ### Round Control
 
-A "round" = one Painter summary sent to Critic + one Critic feedback reply. Phase 2's `max_turns = rounds * 2` bounds the outer chat. Per-round internal tool iterations inside the nested chat are bounded separately by `MAX_TOOL_ITERATIONS = 8` (defined in `config.py`). `RoundTracker` increments on each Painter→Critic send (via `create_save_hook`) and produces the `round_NN.png` filenames. There is no custom `_is_termination_msg` — an earlier version used one to guard round count, but AG2 invokes it on *incoming* messages, which briefly killed both phases (Phase 1 terminated on the "Paint: X" message arriving; Phase 2 terminated on the first Critic feedback). `max_turns` alone is sufficient once the counts are set correctly.
+A "round" = one Painter summary sent to Critic + one Critic feedback reply. Phase 2's `max_turns = rounds` bounds the outer chat (each AG2 "turn" is a round-trip). Per-round internal tool iterations inside the nested chat are bounded separately by `MAX_TOOL_ITERATIONS = 8` (pure safety cap; the hand-off termination above is what ends the loop in the normal path). `RoundTracker` increments on each Painter→Critic send (via `create_save_hook`) and produces the `round_NN.png` filenames.
 
-Phase 1 pre-draw is capped separately by `max_turns = MAX_TOOL_ITERATIONS` and terminates naturally when Painter emits a text reply (no tool_calls): PainterExecutor has no LLM, so a text reply breaks the loop.
+Phase 1 pre-draw is capped by `max_turns = MAX_TOOL_ITERATIONS` and terminates at Painter's first text-only reply via the same `is_termination_msg` on PainterExecutor.
 
 ### Model Choice
 
@@ -144,7 +166,7 @@ Canvas ──┬── Tools ──────┼── Agents ── Main
          └── Hooks ──────┘
 ```
 
-This decomposition allows each module to be tested independently without LLM calls. `main.py` orchestrates the two-phase pipeline: Phase 1 pre-draw via `painter_executor.initiate_chat(painter, _phase1_message(prompt, canvas))`, Phase 2 critique loop via `painter.initiate_chat(critic, …, max_turns=rounds*2)`. It also owns the `_nested_chat_message` wiring helper and the `save_conversation_log` writer.
+This decomposition allows each module to be tested independently without LLM calls. `main.py` orchestrates the two-phase pipeline: Phase 1 pre-draw via `painter_executor.initiate_chat(painter, _phase1_message(prompt, canvas))`, Phase 2 critique loop via `painter.initiate_chat(critic, …, max_turns=rounds)`. It also owns the `_nested_chat_message` wiring helper and the `save_conversation_log` writer.
 
 ## Observations
 
@@ -163,7 +185,7 @@ Results from a 10-round run with prompt "a house with a sun and trees":
 - `openai/gpt-4.1-mini` (Painter) showed solid spatial reasoning, correctly interpreting relative positioning feedback and mapping it to pixel coordinates on the 200x200 canvas.
 - `qwen/qwen3.5-flash-02-23` (Critic) provided detailed, well-structured visual feedback with clear priorities. Its vision capability accurately identified shape positioning issues (e.g., "the door looks like two separate rectangles").
 
-*(Note: the "Excellent!" devolution described above motivated the subsequent Critic system-message rewrite, which now forbids declaring the work "done/excellent/complete/perfect" and requires 3–5 specific suggestions per round. A re-benchmark on the updated prompts has not yet been run.)*
+*(Note: the "Excellent!" devolution described above motivated the subsequent Critic system-message rewrite, which now forbids declaring the work "done/excellent/complete/perfect" and requires 3–5 specific suggestions per round. The Painter prompt was also rewritten twice — first to handle a blank first-turn canvas, then again as part of the hand-off-signal decoupling (see "Decoupling the Safety Cap from the Hand-off Signal"). A re-benchmark on the updated prompts has not yet been run.)*
 
 ## Running Tests
 
