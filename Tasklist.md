@@ -34,6 +34,7 @@
 ):`
 - [x] Decouple `MAX_TOOL_ITERATIONS` from hand-off signal: added `is_termination_msg` on `PainterExecutor` (receiver-side per AG2 docs) that terminates on text-only replies; rewrote Painter prompt step 5 to require end-of-turn text summary. Works uniformly in Phase 1 and Phase 2 nested chat; `summary_method="last_msg"` forwards the summary to Critic. Cap is now pure safety.
 - [x] Fix quality degradation across rounds: split `create_strip_images_hook` into `create_strip_assistant_images_hook` (API compliance) + `create_prune_stale_user_images_hook` (prevents stale canvas accumulation). Registered strip→prune→reply chain on both Painter and Critic. Reworded Phase-2 opener to "Please critique the canvas." Rewrote Critic rule 2 to use named regions / shape anchors instead of pixel coordinates; dropped tool-prescription negation. 3-round end-to-end run shows monotonic detail gain and zero `(x, y)` pairs in Critic output.
+- [x] Fix residual Painter image duplication + stale-mid-tool-loop: diagnostic trace on `worktree-diagnostic-ag2-trace` revealed Painter was seeing 2–3 canvas images per LLM call (via `_phase1_message` + `send_hook` + `reply_hook` all attaching) and seeing a stale snapshot inside nested tool-loop iterations (`reply_hook` skipped when last message was tool). Fix: `reply_hook` now scans backward for the last non-tool message, strips any existing `image_url` blocks from its content, then appends the current canvas. `prune_stale_user_images_hook` simplified to strip images from every user message unconditionally. Post-fix 3-round diagnostic: 11/11 LLM calls show exactly 1 image, mid tool-loop Painter calls now carry the canvas on the preceding user message.
 
 ## Todo
 
@@ -93,7 +94,6 @@ points.11
 - Rename `"TERMINATE"` in `_executor_mock` — `max_turns` handles termination now; the literal is misleading to readers
 - Add unit test asserting Phase 1 `clear_history=True` is passed to `initiate_chat` (matters for repeatable runs)
 - If `setup_pipeline` grows further, split into `_wire_tools` / `_wire_nested_chat` / `_wire_hooks`
-- Add explicit prune-hook test for interleaved user/assistant/user case (exercises `last_user_idx` reverse scan when non-user messages follow the last user)
-- Add negative ordering test: register reply before prune, assert canvas gets pruned (would have caught ordering-drift on a subtle refactor)
-- `_phase1_message` attaches the blank canvas explicitly even though Painter's `reply_hook` will also attach it — two identical image blocks on turn 1. Harmless but wasted tokens; consider dropping the explicit attachment in `_phase1_message`
+- `_phase1_message` still attaches a blank canvas explicitly, which reply_hook now strips and replaces with the current canvas — harmless under the idempotent hook but adds wasted work. Consider dropping the explicit attachment in `_phase1_message`.
 - Consider `wire_canvas_agent(agent, canvas, *, sends_canvas: bool)` helper if a third canvas-aware agent appears (currently 6 `register_hook` calls × 2 agents = tolerable duplication, extracting now would hide load-bearing order)
+- Port `scripts/trace_run.py` (lightweight LLM-input trace hook diagnostic) from the `worktree-diagnostic-ag2-trace` branch to main if ongoing hook-chain work warrants a repeatable diagnostic

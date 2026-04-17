@@ -128,6 +128,9 @@ def create_reply_hook(canvas: Canvas) -> Callable:
         )
 
         if target_idx is None:
+            # No user/assistant-text anchor exists (all messages are tool-like).
+            # Return unchanged rather than invent a target; in the normal flow
+            # a user message from initiate_chat always exists before any tool.
             return messages
 
         target = messages[target_idx]

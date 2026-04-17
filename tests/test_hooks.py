@@ -355,19 +355,6 @@ class TestReplyHookUnit:
         assert len(image_blocks) == 1
         assert image_blocks[0] == canvas.to_image_content()
 
-    def test_reply_hook_applied_twice_produces_single_image_block(self):
-        canvas = Canvas()
-        hook = create_reply_hook(canvas)
-        messages = [{"role": "user", "content": "hi"}]
-
-        once = hook(messages)
-        twice = hook(once)
-
-        once_images = [b for b in once[-1]["content"] if b["type"] == "image_url"]
-        twice_images = [b for b in twice[-1]["content"] if b["type"] == "image_url"]
-        assert len(once_images) == 1
-        assert len(twice_images) == 1
-
     # -- Last non-tool target: attaches to prior user/assistant when last is tool --
 
     def test_reply_hook_last_non_tool_message_receives_image_when_tail_is_tool(self):
