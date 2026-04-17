@@ -30,7 +30,7 @@ When you are creating a plan, implementing or fixing issue always use following 
 
 Throughout every step below:
 
-- **Surface assumptions / ask when unclear.** Don't silently pick between interpretations. If a simpler approach exists, say so. Stop and name confusion rather than guessing.
+- **Think Before acting / Surface assumptions / ask when unclear.** Don't silently pick between interpretations. If a simpler approach exists, say so. Stop and name confusion rather than guessing.
 - **Surgical changes.** Every changed line should trace to the request. Don't "improve" adjacent code, comments, or formatting. Match existing style. Remove only orphans your own change created; flag pre-existing dead code rather than deleting it.
 
 1. Make sure that ALL fast tests pass. Ask user what to do if they fail.
