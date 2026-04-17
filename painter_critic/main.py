@@ -48,6 +48,16 @@ def save_conversation_log(chat_history: list[dict], output_dir: str) -> None:
     log_path.write_text("".join(lines))
 
 
+def _nested_chat_message(recipient, messages, sender, config):
+    # AG2 passes messages[-1]["content"] directly as the nested chat's initial
+    # message. When Critic's send_hook produced multimodal list content, that
+    # bare list trips _append_oai_message validation. Wrap it in a dict.
+    content = messages[-1].get("content", "")
+    if isinstance(content, list):
+        return {"content": content}
+    return content or ""
+
+
 def setup_pipeline(
     prompt,
     rounds=DEFAULT_ROUNDS,
@@ -73,6 +83,7 @@ def setup_pipeline(
             {
                 "sender": painter_executor,
                 "recipient": painter,
+                "message": _nested_chat_message,
                 "max_turns": MAX_TOOL_ITERATIONS,
                 "summary_method": "last_msg",
             }

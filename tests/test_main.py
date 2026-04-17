@@ -223,3 +223,41 @@ class TestRunPipelinePhase1Message:
         assert "image_url" in types, (
             f"Phase 1 message must include an image_url block; got types: {types}"
         )
+
+
+class TestNestedChatMessage:
+    """_nested_chat_message wraps the trigger message so AG2's nested
+    initiate_chat accepts multimodal (list-typed) content without raising.
+    """
+
+    def test_nested_chat_message_wraps_list_content_in_dict(self):
+        from painter_critic.main import _nested_chat_message
+
+        multimodal = [
+            {"type": "text", "text": "Add more red."},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
+        ]
+        messages = [{"role": "user", "content": multimodal}]
+
+        result = _nested_chat_message(None, messages, None, None)
+
+        assert isinstance(result, dict)
+        assert result["content"] == multimodal
+
+    def test_nested_chat_message_passes_string_content_through(self):
+        from painter_critic.main import _nested_chat_message
+
+        messages = [{"role": "user", "content": "plain feedback"}]
+
+        result = _nested_chat_message(None, messages, None, None)
+
+        assert result == "plain feedback"
+
+    def test_nested_chat_message_handles_missing_content(self):
+        from painter_critic.main import _nested_chat_message
+
+        messages = [{"role": "user"}]
+
+        result = _nested_chat_message(None, messages, None, None)
+
+        assert result == ""
