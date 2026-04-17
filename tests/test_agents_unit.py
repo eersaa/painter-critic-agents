@@ -66,3 +66,68 @@ class TestAgentsUnit:
         painter, _, _ = create_agents("a cat & dog")
 
         assert "a cat & dog" in painter.system_message
+
+    # --- PainterExecutor.is_termination_msg ---
+
+    def test_painter_executor_termination_callable_is_custom(self, api_url_env):
+        """Default AG2 termination lambda always returns False for any dict;
+        our custom one must return True for text-only replies."""
+        _, painter_executor, _ = create_agents("a red circle")
+
+        assert callable(painter_executor._is_termination_msg)
+        assert painter_executor._is_termination_msg({"content": "anything"}) is True
+
+    def test_painter_executor_terminates_on_tool_calls_none(self, api_url_env):
+        _, painter_executor, _ = create_agents("a red circle")
+
+        assert painter_executor._is_termination_msg(
+            {"content": "done", "tool_calls": None}
+        )
+
+    def test_painter_executor_continues_on_single_tool_call(self, api_url_env):
+        _, painter_executor, _ = create_agents("a red circle")
+
+        assert not painter_executor._is_termination_msg(
+            {"tool_calls": [{"id": "a", "function": {"name": "draw_circle"}}]}
+        )
+
+    def test_painter_executor_continues_on_multiple_tool_calls(self, api_url_env):
+        _, painter_executor, _ = create_agents("a red circle")
+
+        assert not painter_executor._is_termination_msg(
+            {
+                "tool_calls": [
+                    {"id": "a", "function": {"name": "draw_circle"}},
+                    {"id": "b", "function": {"name": "draw_rectangle"}},
+                    {"id": "c", "function": {"name": "draw_line"}},
+                ]
+            }
+        )
+
+    # --- Painter system message: end-of-turn summary ---
+
+    def test_painter_prompt_mentions_summary(self, api_url_env):
+        painter, _, _ = create_agents("a red circle")
+
+        assert "summar" in painter.system_message.lower()
+
+    def test_painter_prompt_summary_colocated_with_handoff_language(self, api_url_env):
+        """The summary instruction must be tied to turn/round end or handoff
+        to Critic — not just the word "summary" in isolation."""
+        painter, _, _ = create_agents("a red circle")
+
+        msg = painter.system_message.lower()
+        idx = msg.find("summar")
+        assert idx != -1
+        window = msg[max(0, idx - 120) : idx + 120]
+        assert any(kw in window for kw in ("turn", "round", "critic", "hand")), (
+            f"'summar' not near handoff language; window={window!r}"
+        )
+
+    def test_painter_prompt_old_forbidding_phrase_removed(self, api_url_env):
+        """The old phrase actively forbids text replies; it must be gone so
+        the new end-of-turn summary instruction is not contradicted."""
+        painter, _, _ = create_agents("a red circle")
+
+        forbidden = "your job is\n     to keep improving it every round"
+        assert forbidden not in painter.system_message

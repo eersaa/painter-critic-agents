@@ -42,8 +42,10 @@ def create_agents(
         "     progress.\n"
         "  4. If a tool returns an error string, read it and retry with\n"
         "     valid input.\n"
-        "  5. Do not praise the image or declare it finished; your job is\n"
-        "     to keep improving it every round."
+        "  5. After your tool calls, end each turn with one short\n"
+        "     plain-text summary of what changed this turn to hand off\n"
+        "     to the Critic. Never declare the overall work done,\n"
+        "     perfect, or finished — keep improving across rounds."
     )
 
     critic_system_message = (
@@ -90,6 +92,7 @@ def create_agents(
         llm_config=False,
         human_input_mode="NEVER",
         code_execution_config=False,
+        is_termination_msg=lambda msg: not msg.get("tool_calls"),
     )
 
     critic = ConversableAgent(
