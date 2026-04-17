@@ -17,7 +17,7 @@ class TestSaveConversationLogUnit:
 
         history = [{"name": "Critic", "content": "Hello", "role": "user"}]
 
-        save_conversation_log(history, str(tmp_output_dir))
+        save_conversation_log(history, str(tmp_output_dir), "x")
 
         assert (tmp_output_dir / "conversation.log").exists()
 
@@ -31,7 +31,7 @@ class TestSaveConversationLogUnit:
             {"name": "Painter", "content": "I drew a circle", "role": "assistant"},
         ]
 
-        save_conversation_log(history, str(tmp_output_dir))
+        save_conversation_log(history, str(tmp_output_dir), "x")
 
         content = (tmp_output_dir / "conversation.log").read_text()
         assert "Critic" in content
@@ -57,7 +57,7 @@ class TestSaveConversationLogUnit:
             },
         ]
 
-        save_conversation_log(history, str(tmp_output_dir))
+        save_conversation_log(history, str(tmp_output_dir), "x")
 
         content = (tmp_output_dir / "conversation.log").read_text()
         assert "Nice painting!" in content
@@ -74,7 +74,7 @@ class TestSaveConversationLogUnit:
             {"name": "Painter", "content": None, "role": "assistant"},
         ]
 
-        save_conversation_log(history, str(tmp_output_dir))
+        save_conversation_log(history, str(tmp_output_dir), "x")
 
         content = (tmp_output_dir / "conversation.log").read_text()
         assert "[tool call]" in content
@@ -88,7 +88,7 @@ class TestSaveConversationLogUnit:
             {"name": "Painter", "content": "I drew a red square", "role": "assistant"},
         ]
 
-        save_conversation_log(history, str(tmp_output_dir))
+        save_conversation_log(history, str(tmp_output_dir), "x")
 
         content = (tmp_output_dir / "conversation.log").read_text()
         assert "I drew a red square" in content
@@ -103,7 +103,7 @@ class TestSaveConversationLogUnit:
 
         history = [{"name": "Critic", "content": "Hello", "role": "user"}]
 
-        save_conversation_log(history, str(tmp_output_dir))
+        save_conversation_log(history, str(tmp_output_dir), "x")
 
         assert tmp_output_dir.exists()
         assert (tmp_output_dir / "conversation.log").exists()
@@ -113,7 +113,7 @@ class TestSaveConversationLogUnit:
     def test_main_save_log_empty_history_creates_empty_file(self, tmp_output_dir):
         from painter_critic.main import save_conversation_log
 
-        save_conversation_log([], str(tmp_output_dir))
+        save_conversation_log([], str(tmp_output_dir), "x")
 
         log_path = tmp_output_dir / "conversation.log"
         assert log_path.exists()
@@ -130,7 +130,7 @@ class TestSaveConversationLogUnit:
             {"name": "Critic", "content": "Please draw a house", "role": "user"},
         ]
 
-        save_conversation_log(history, str(tmp_output_dir))
+        save_conversation_log(history, str(tmp_output_dir), "x")
 
         content = (tmp_output_dir / "conversation.log").read_text()
         assert "--- Critic ---" in content
@@ -145,7 +145,7 @@ class TestSaveConversationLogUnit:
             {"name": "Critic", "content": "Add leaves", "role": "user"},
         ]
 
-        save_conversation_log(history, str(tmp_output_dir))
+        save_conversation_log(history, str(tmp_output_dir), "x")
 
         content = (tmp_output_dir / "conversation.log").read_text()
         assert "--- Critic ---" in content
@@ -172,12 +172,43 @@ class TestSaveConversationLogUnit:
             },
         ]
 
-        save_conversation_log(history, str(tmp_output_dir))
+        save_conversation_log(history, str(tmp_output_dir), "x")
 
         content = (tmp_output_dir / "conversation.log").read_text()
         # Both text blocks should be joined in the output
         assert "First thought." in content
         assert "Second thought." in content
+
+    # --- User prompt header prepended to log ---
+
+    def test_main_save_log_prepends_user_header_when_prompt_given(
+        self, tmp_output_dir
+    ):
+        from painter_critic.main import save_conversation_log
+
+        history = [{"name": "Painter", "content": "done", "role": "assistant"}]
+
+        save_conversation_log(history, str(tmp_output_dir), "a red square")
+
+        content = (tmp_output_dir / "conversation.log").read_text()
+        assert "--- User ---" in content
+        assert "Paint: a red square" in content
+
+    def test_main_save_log_user_header_precedes_chat_history(self, tmp_output_dir):
+        from painter_critic.main import save_conversation_log
+
+        history = [{"name": "Painter", "content": "done", "role": "assistant"}]
+
+        save_conversation_log(history, str(tmp_output_dir), "a red square")
+
+        content = (tmp_output_dir / "conversation.log").read_text()
+        assert content.index("--- User ---") < content.index("--- Painter ---")
+
+    def test_main_save_log_prompt_is_required_positional_arg(self, tmp_output_dir):
+        from painter_critic.main import save_conversation_log
+
+        with pytest.raises(TypeError):
+            save_conversation_log([], str(tmp_output_dir))
 
 
 class _FakeChatResult:
