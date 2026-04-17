@@ -23,12 +23,22 @@
 - [x] Rewrote Painter and Critic system messages to handle first-turn-blank-canvas explicitly and forbid premature completion claims
 - [x] Fixed nested chat ValueError on multimodal Critic feedback via `_nested_chat_message` callable in `chat_queue`
 - [x] Architect review post-nested-chat fix: dropped unused `rounds` param from `setup_pipeline`; extracted `_phase1_message(prompt, canvas)` helper to remove duplication between `run_pipeline` and `_run_mocked_pipeline`
+- With following prompt I hit some limit. Is it because of some restriction of the API or is it programmed into this application? Prompt: "Paint a phorealistic, truelike, sportscar with shiny wheels in light blue body color."
+  - Error message `>>>>>>>> TERMINATING RUN (f0a3180e-3a0d-4712-829a-9f9ac12ca1fe): Maximum turns (40) reached`
+  - Addressed with rounds: `def run_pipeline(
+    prompt,
+    rounds=DEFAULT_ROUNDS,
+    output_dir=OUTPUT_DIR,
+    painter_model=DEFAULT_PAINTER_MODEL,
+    critic_model=DEFAULT_CRITIC_MODEL,
+):`
+- [x] Decouple `MAX_TOOL_ITERATIONS` from hand-off signal: added `is_termination_msg` on `PainterExecutor` (receiver-side per AG2 docs) that terminates on text-only replies; rewrote Painter prompt step 5 to require end-of-turn text summary. Works uniformly in Phase 1 and Phase 2 nested chat; `summary_method="last_msg"` forwards the summary to Critic. Cap is now pure safety.
 
 ## Todo
 
+- One issue is that the picture gets worse and worse over the conversation so I don't know what are the ways to address that I would make sure that the critique really sees the picture and the painter also sees and understands the picture
+ and what to draw and I don't know are those exact pixel points from the critique agent confusing for the painter
 - The conversation log isn't most readable for the user. And same applies to the output what user gets to the terminal.
-- With following prompt I hit some limit. Is it because of some restriction of the API or is it programmed into this application? Prompt: "Paint a phorealistic, truelike, sportscar with shiny wheels in light blue body color."
-  - Error message `>>>>>>>> TERMINATING RUN (f0a3180e-3a0d-4712-829a-9f9ac12ca1fe): Maximum turns (40) reached`
 - It seems that there is some difference how the model wants to get the tools because with default models there is no this error but when I use the Qwen model for the painter I will get this error that the tools are listed in wrong kind of data structure.
   - `>>>>>>>> EXECUTED FUNCTION draw_polygon...
 Call ID: call_47243106640e446c9d999772
