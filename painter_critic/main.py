@@ -148,7 +148,7 @@ def run_pipeline(
     # max_turns = number of rounds to iterate on the drawing
     result = painter.initiate_chat(
         critic,
-        message=f"I have painted: {prompt}. Please review.",
+        message="Please critique the canvas.",
         max_turns=rounds,
     )
     return result

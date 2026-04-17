@@ -3,6 +3,7 @@
 RED phase: these tests define expected behavior before implementation exists.
 """
 
+import pytest
 from unittest.mock import patch
 
 
@@ -261,3 +262,86 @@ class TestNestedChatMessage:
         result = _nested_chat_message(None, messages, None, None)
 
         assert result == ""
+
+
+class TestSetupPipelineHookWiring:
+    """Pin the hook ordering on process_all_messages_before_reply for both
+    agents: strip-assistant → prune-stale-user → reply. Ordering is
+    load-bearing — reply must run last so the attached image survives pruning."""
+
+    @pytest.fixture()
+    def pipeline(self, api_url_env):
+        from painter_critic.main import setup_pipeline
+
+        painter, executor, critic, canvas, tools, tracker = setup_pipeline("test")
+        return painter, executor, critic, canvas, tools, tracker
+
+    def _run_chain(self, agent, messages):
+        result = messages
+        for hook in agent.hook_lists["process_all_messages_before_reply"]:
+            result = hook(result)
+        return result
+
+    def test_setup_pipeline_painter_pre_reply_chain_has_three_hooks(self, pipeline):
+        painter, *_ = pipeline
+
+        assert len(painter.hook_lists["process_all_messages_before_reply"]) == 3
+
+    def test_setup_pipeline_critic_pre_reply_chain_has_three_hooks(self, pipeline):
+        _, _, critic, *_ = pipeline
+
+        assert len(critic.hook_lists["process_all_messages_before_reply"]) == 3
+
+    def test_setup_pipeline_painter_chain_strips_assistant_images(self, pipeline):
+        painter, _, _, canvas, *_ = pipeline
+        image = canvas.to_image_content()
+        messages = [
+            {"role": "assistant", "content": [{"type": "text", "text": "r"}, image]},
+            {"role": "user", "content": [{"type": "text", "text": "u"}, image]},
+        ]
+
+        result = self._run_chain(painter, messages)
+
+        assistant_types = [b["type"] for b in result[0]["content"]]
+        assert "image_url" not in assistant_types
+
+    def test_setup_pipeline_painter_chain_prunes_stale_user_images(self, pipeline):
+        painter, _, _, canvas, *_ = pipeline
+        image = canvas.to_image_content()
+        messages = [
+            {"role": "user", "content": [{"type": "text", "text": "old"}, image]},
+            {"role": "user", "content": [{"type": "text", "text": "new"}, image]},
+        ]
+
+        result = self._run_chain(painter, messages)
+
+        first_types = [b["type"] for b in result[0]["content"]]
+        assert "image_url" not in first_types
+
+    def test_setup_pipeline_painter_chain_last_message_carries_current_canvas(
+        self, pipeline
+    ):
+        painter, _, _, canvas, *_ = pipeline
+        messages = [{"role": "user", "content": "ping"}]
+
+        result = self._run_chain(painter, messages)
+
+        last_content = result[-1]["content"]
+        assert isinstance(last_content, list)
+        image_blocks = [b for b in last_content if b.get("type") == "image_url"]
+        assert len(image_blocks) == 1
+        assert image_blocks[0] == canvas.to_image_content()
+
+    def test_setup_pipeline_critic_chain_last_message_carries_current_canvas(
+        self, pipeline
+    ):
+        _, _, critic, canvas, *_ = pipeline
+        messages = [{"role": "user", "content": "ping"}]
+
+        result = self._run_chain(critic, messages)
+
+        last_content = result[-1]["content"]
+        assert isinstance(last_content, list)
+        image_blocks = [b for b in last_content if b.get("type") == "image_url"]
+        assert len(image_blocks) == 1
+        assert image_blocks[0] == canvas.to_image_content()
