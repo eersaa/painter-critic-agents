@@ -4,7 +4,7 @@ import pytest
 from autogen import ConversableAgent
 from PIL import Image
 
-from painter_critic.main import setup_pipeline
+from painter_critic.main import _phase1_message, setup_pipeline
 
 
 def _make_painter_mock(tools):
@@ -51,7 +51,7 @@ def _run_mocked_pipeline(output_dir, rounds=3, painter_reply_factory=None):
     Returns (ChatResult from Phase 2, canvas, tools).
     """
     painter, painter_executor, critic, canvas, tools, tracker = setup_pipeline(
-        "test subject", rounds=rounds, output_dir=output_dir
+        "test subject", output_dir=output_dir
     )
 
     if painter_reply_factory:
@@ -80,12 +80,7 @@ def _run_mocked_pipeline(output_dir, rounds=3, painter_reply_factory=None):
     # Multimodal message mirrors run_pipeline: Painter needs a canvas image to know what to draw.
     painter_executor.initiate_chat(
         painter,
-        message={
-            "content": [
-                {"type": "text", "text": "Paint: test subject"},
-                canvas.to_image_content(),
-            ]
-        },
+        message=_phase1_message("test subject", canvas),
         max_turns=2,
         silent=True,
     )
@@ -107,7 +102,7 @@ class TestArchitectureAcceptance:
 
     def test_setup_pipeline_returns_painter_executor(self, tmp_output_dir, api_url_env):
         painter, painter_executor, critic, canvas, tools, tracker = setup_pipeline(
-            "x", rounds=1, output_dir=str(tmp_output_dir)
+            "x", output_dir=str(tmp_output_dir)
         )
 
         assert isinstance(painter_executor, ConversableAgent)
@@ -117,9 +112,7 @@ class TestArchitectureAcceptance:
     def test_setup_pipeline_critic_has_no_drawing_tools(
         self, tmp_output_dir, api_url_env
     ):
-        _, _, critic, _, _, _ = setup_pipeline(
-            "x", rounds=1, output_dir=str(tmp_output_dir)
-        )
+        _, _, critic, _, _, _ = setup_pipeline("x", output_dir=str(tmp_output_dir))
 
         assert critic.function_map == {}
 
@@ -127,7 +120,7 @@ class TestArchitectureAcceptance:
         self, tmp_output_dir, api_url_env
     ):
         _, painter_executor, _, _, tools, _ = setup_pipeline(
-            "x", rounds=1, output_dir=str(tmp_output_dir)
+            "x", output_dir=str(tmp_output_dir)
         )
 
         assert set(painter_executor.function_map.keys()) == set(tools.keys())

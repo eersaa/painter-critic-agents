@@ -58,9 +58,17 @@ def _nested_chat_message(recipient, messages, sender, config):
     return content or ""
 
 
+def _phase1_message(prompt, canvas):
+    return {
+        "content": [
+            {"type": "text", "text": f"Paint: {prompt}"},
+            canvas.to_image_content(),
+        ]
+    }
+
+
 def setup_pipeline(
     prompt,
-    rounds=DEFAULT_ROUNDS,
     output_dir=OUTPUT_DIR,
     painter_model=DEFAULT_PAINTER_MODEL,
     critic_model=DEFAULT_CRITIC_MODEL,
@@ -112,18 +120,13 @@ def run_pipeline(
     critic_model=DEFAULT_CRITIC_MODEL,
 ):
     painter, painter_executor, critic, canvas, tools, tracker = setup_pipeline(
-        prompt, rounds, output_dir, painter_model, critic_model
+        prompt, output_dir, painter_model, critic_model
     )
 
     # Phase 1: pre-draw. Executor kicks off Painter's LLM↔tool loop to produce first attempt.
     painter_executor.initiate_chat(
         painter,
-        message={
-            "content": [
-                {"type": "text", "text": f"Paint: {prompt}"},
-                canvas.to_image_content(),
-            ]
-        },
+        message=_phase1_message(prompt, canvas),
         max_turns=MAX_TOOL_ITERATIONS,
         clear_history=True,
     )
