@@ -273,7 +273,7 @@ class TestReplyHookUnit:
 
     # -- Guard: last message has tool_calls --
 
-    def test_reply_hook_skips_when_last_has_tool_calls(self):
+    def test_reply_hook_tool_calls_message_left_unchanged(self):
         canvas = Canvas()
         hook = create_reply_hook(canvas)
         messages = [
@@ -288,7 +288,7 @@ class TestReplyHookUnit:
 
     # -- Guard: last message has role=tool --
 
-    def test_reply_hook_skips_when_last_has_role_tool(self):
+    def test_reply_hook_role_tool_message_left_unchanged(self):
         canvas = Canvas()
         hook = create_reply_hook(canvas)
         messages = [
@@ -332,6 +332,88 @@ class TestReplyHookUnit:
         ][0]
 
         assert blank_image != drawn_image
+
+    # -- Idempotent: strips any stale image before appending current --
+
+    def test_reply_hook_strips_stale_image_block_from_target_message(self):
+        canvas = Canvas()
+        hook = create_reply_hook(canvas)
+        stale = {
+            "type": "image_url",
+            "image_url": {"url": "data:image/png;base64,STALE"},
+        }
+        messages = [
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": "hi"}, stale],
+            }
+        ]
+
+        result = hook(messages)
+
+        image_blocks = [b for b in result[-1]["content"] if b["type"] == "image_url"]
+        assert len(image_blocks) == 1
+        assert image_blocks[0] == canvas.to_image_content()
+
+    def test_reply_hook_applied_twice_produces_single_image_block(self):
+        canvas = Canvas()
+        hook = create_reply_hook(canvas)
+        messages = [{"role": "user", "content": "hi"}]
+
+        once = hook(messages)
+        twice = hook(once)
+
+        once_images = [b for b in once[-1]["content"] if b["type"] == "image_url"]
+        twice_images = [b for b in twice[-1]["content"] if b["type"] == "image_url"]
+        assert len(once_images) == 1
+        assert len(twice_images) == 1
+
+    # -- Last non-tool target: attaches to prior user/assistant when last is tool --
+
+    def test_reply_hook_last_non_tool_message_receives_image_when_tail_is_tool(self):
+        canvas = Canvas()
+        hook = create_reply_hook(canvas)
+        messages = [
+            {"role": "user", "content": "paint a circle"},
+            {"role": "assistant", "content": "call", "tool_calls": [{"id": "1"}]},
+            {"role": "tool", "content": "rectangle drawn"},
+        ]
+
+        result = hook(messages)
+
+        target = next(m for m in result if m.get("role") == "user")
+        image_blocks = [
+            b
+            for b in target["content"]
+            if isinstance(b, dict) and b.get("type") == "image_url"
+        ]
+        assert len(image_blocks) == 1
+
+    def test_reply_hook_all_tool_messages_returns_input_unchanged(self):
+        canvas = Canvas()
+        hook = create_reply_hook(canvas)
+        messages = [
+            {"role": "tool", "content": "a"},
+            {"role": "tool", "content": "b"},
+        ]
+
+        result = hook(messages)
+
+        assert result == messages
+
+    def test_reply_hook_assistant_tool_calls_plus_tool_returns_input_unchanged(self):
+        """Edge case: no user/assistant-text message exists. Hook has nowhere
+        safe to attach, so returns unchanged."""
+        canvas = Canvas()
+        hook = create_reply_hook(canvas)
+        messages = [
+            {"role": "assistant", "content": "call", "tool_calls": [{"id": "1"}]},
+            {"role": "tool", "content": "result"},
+        ]
+
+        result = hook(messages)
+
+        assert result == messages
 
 
 class TestSaveHookUnit:
