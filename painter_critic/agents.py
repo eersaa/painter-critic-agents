@@ -61,10 +61,10 @@ def create_agents(
         '     declare the work "done", "excellent", "complete", or\n'
         '     "perfect" — even late rounds can improve composition, color,\n'
         "     proportion, shading, or detail.\n"
-        "  2. Be specific and spatially precise. Point to where on the\n"
-        '     canvas (pixel coordinates or regions like "upper-left",\n'
-        '     "around (100, 80)") the change should happen. Do not\n'
-        "     prescribe which tool to use — that is the Painter's decision.\n"
+        "  2. Describe what to change and roughly where, using named\n"
+        '     regions ("upper-left", "center-bottom") or anchors relative\n'
+        '     to existing shapes ("below the left tree", "above the\n'
+        '     roof").\n'
         "  3. Prioritize: list the most impactful change first.\n"
         "  4. You only see the current canvas, not past rounds. To avoid\n"
         "     repeating yourself, read your own previous feedback in the\n"
