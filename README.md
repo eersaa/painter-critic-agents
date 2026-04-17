@@ -74,11 +74,6 @@ Current design decouples the two:
 
 `MAX_TOOL_ITERATIONS = 8` is now a pure safety cap.
 
-### Models
-
-- **Painter: `openai/gpt-4.1-mini`** — tool-calling + spatial reasoning.
-- **Critic: `qwen/qwen3.5-flash-02-23`** — accurate vision. gpt-4.1-mini misidentified a red image as blue in tests; gpt-4.1-nano has no vision.
-
 ### Drawing tools
 
 | Tool | Purpose |
@@ -101,7 +96,7 @@ Both agents see the canvas as a base64 PNG in OpenAI's vision format. Hooks:
 
 ### Critic feedback style
 
-Critic describes location by named regions ("upper-left", "below the left tree"), not pixel coordinates. Pixel numbers from an LLM on a 200×200 image are false precision; the Painter, who already sees the canvas, picks exact coordinates itself.
+Critic describes location by named regions ("upper-left", "below the left tree"), not pixel coordinates. And gives suggestions how to improve the drawing.
 
 ### Module structure
 
@@ -122,16 +117,17 @@ Results from a 10-round run with prompt "a photorealistic light blue sportscar w
 **What worked well:**
 - Critic never declared the work "done/excellent/perfect" and produced 3–5 coordinate-aware suggestions per turn across all 10 rounds.
 - Painter's text summary drove the hand-off cleanly; no `max_turns` cutoff artifacts.
-- Visible progression: round 1 flat cartoon sedan → round 10 layered blue tones, black tires with silver rims, cast shadow, road markings.
+- Visible progression: There was visible changes on every iteration. And painter was using usually multiple tools and mutliple times.
 
 **What went wrong:**
-- **Non-monotonic progress.** Round 5 is less coherent than round 1. Painter reworks geometry aggressively each round instead of preserving what already looked good.
+- **Non-monotonic progress.** Round 5 is less coherent than round 1. Painter reworks geometry aggressively each round instead of preserving what already looked good. I.e. The final result is worse than the first iteration.
 - **Critic loops on impossible asks.** "Shinier wheels", "less boxy", "glossier paint" recur — a 200×200 canvas without anti-aliasing can't deliver photorealism.
-- **`draw_line` unused.** Painter preferred rectangles/circles/polygons even when Critic asked for outlines.
+- **`draw_line` was not really utilized.** Painter preferred rectangles/circles/polygons even when Critic asked for outlines.
 
-**Models:**
-- `openai/gpt-4.1-mini` (Painter) — solid spatial reasoning, weak at preserving prior-round structure.
-- `qwen/qwen3.5-flash-02-23` (Critic) — vision-accurate, structured output held across all rounds.
+### Models
+
+- **Painter: `openai/gpt-4.1-mini`** — tool-calling + spatial reasoning. Solid spatial reasoning, weak at preserving prior-round structure.
+- **Critic: `qwen/qwen3.5-flash-02-23`** — accurate vision, structured output held across all rounds.
 
 ## Running Tests
 

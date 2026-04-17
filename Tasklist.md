@@ -38,7 +38,6 @@
 - [x] Include initial user prompt in `conversation.log`: `save_conversation_log` now takes required `prompt: str`; always prepends `--- User ---\nPaint: {prompt}\n\n` before chat history. Slow test header set expanded to allow `--- User ---`.
 
 ## Todo
-
 - The conversation log isn't most readable for the user. And same applies to the output what user gets to the terminal.
 - It seems that there is some difference how the model wants to get the tools because with default models there is no this error but when I use the Qwen model for the painter I will get this error that the tools are listed in wrong kind of data structure.
   - `>>>>>>>> EXECUTED FUNCTION draw_polygon...
@@ -82,7 +81,8 @@ points.10
 points.11
   Input should be a valid list [type=list_type, input_value=165, input_type=int]
     For further information visit https://errors.pydantic.dev/2.13/v/list_type`
-- Need to document the updated agent architecture now that painter consists from two agents because of AG2 requirements and the critique agent is still one agent and additionally probably need to update the way they are working so painter is initiating the process if it is presented in the README file.
+- `image_url` blocks from assistant-role messages. API compliance: OpenAI/Anthropic chat endpoints reject images inside assistant turns.
+  - Is this really true for these. I get a bit contradict information from https://docs.ag2.ai/latest/docs/use-cases/notebooks/notebooks/agentchat_oai_responses_image/?h=image
 
 
 ## Future Improvements
