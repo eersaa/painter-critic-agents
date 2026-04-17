@@ -71,9 +71,11 @@ def create_save_hook(
 
 
 def _strip_images(msg: dict) -> dict:
-    """Return a copy of msg with image_url blocks removed from its content list."""
+    """Return a copy of msg with image_url blocks removed from its content."""
     stripped = dict(msg)
-    stripped["content"] = [b for b in msg["content"] if b.get("type") != "image_url"]
+    content = msg.get("content")
+    if isinstance(content, list):
+        stripped["content"] = [b for b in content if b.get("type") != "image_url"]
     return stripped
 
 
@@ -130,16 +132,26 @@ def create_reply_hook(canvas: Canvas) -> Callable:
         if not messages:
             return messages
 
-        last = messages[-1]
-
-        if _is_tool_message(last):
-            return messages
-
-        last_copy = dict(last)
-        last_copy["content"] = _append_image(
-            last_copy["content"], canvas.to_image_content()
+        target_idx = next(
+            (
+                i
+                for i in range(len(messages) - 1, -1, -1)
+                if not _is_tool_message(messages[i])
+            ),
+            None,
         )
 
-        return list(messages[:-1]) + [last_copy]
+        if target_idx is None:
+            return messages
+
+        target = messages[target_idx]
+        new_msg = _strip_images(target)
+        new_msg["content"] = _append_image(
+            new_msg["content"], canvas.to_image_content()
+        )
+
+        return (
+            list(messages[:target_idx]) + [new_msg] + list(messages[target_idx + 1 :])
+        )
 
     return hook
