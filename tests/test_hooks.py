@@ -3,9 +3,11 @@ import copy
 from painter_critic.canvas import Canvas
 from painter_critic.hooks import (
     RoundTracker,
+    create_prune_stale_user_images_hook,
     create_reply_hook,
     create_save_hook,
     create_send_hook,
+    create_strip_assistant_images_hook,
 )
 
 
@@ -469,3 +471,116 @@ class TestSaveHookUnit:
         hook("painter", msg, _FakeAgent("Critic"), False)
 
         assert (tmp_output_dir / "round_01.png").exists()
+
+
+class TestStripAssistantImagesHookUnit:
+    def test_strip_assistant_images_hook_returns_callable(self):
+        hook = create_strip_assistant_images_hook()
+
+        assert callable(hook)
+
+    def test_strip_assistant_images_hook_removes_image_blocks_from_assistant_messages(
+        self,
+    ):
+        canvas = Canvas()
+        image = canvas.to_image_content()
+        hook = create_strip_assistant_images_hook()
+        messages = [
+            {"role": "assistant", "content": [{"type": "text", "text": "reply"}, image]},
+        ]
+
+        result = hook(messages)
+
+        types = [b["type"] for b in result[0]["content"]]
+        assert "image_url" not in types
+        assert "text" in types
+
+    def test_strip_assistant_images_hook_leaves_user_messages_untouched(self):
+        canvas = Canvas()
+        image = canvas.to_image_content()
+        hook = create_strip_assistant_images_hook()
+        user_msg = {"role": "user", "content": [{"type": "text", "text": "hi"}, image]}
+
+        result = hook([user_msg])
+
+        assert result == [user_msg]
+
+    def test_strip_assistant_images_hook_leaves_string_content_untouched(self):
+        hook = create_strip_assistant_images_hook()
+        msg = {"role": "assistant", "content": "plain text reply"}
+
+        result = hook([msg])
+
+        assert result == [msg]
+
+    def test_strip_assistant_images_hook_does_not_mutate_input(self):
+        canvas = Canvas()
+        image = canvas.to_image_content()
+        hook = create_strip_assistant_images_hook()
+        messages = [
+            {"role": "assistant", "content": [{"type": "text", "text": "r"}, image]},
+        ]
+        original = copy.deepcopy(messages)
+
+        hook(messages)
+
+        assert messages == original
+
+
+class TestPruneStaleUserImagesHookUnit:
+    def test_prune_stale_user_images_hook_returns_callable(self):
+        hook = create_prune_stale_user_images_hook()
+
+        assert callable(hook)
+
+    def test_prune_stale_user_images_hook_keeps_image_on_only_last_user_message(self):
+        canvas = Canvas()
+        image = canvas.to_image_content()
+        hook = create_prune_stale_user_images_hook()
+        messages = [
+            {"role": "user", "content": [{"type": "text", "text": "first"}, image]},
+            {"role": "user", "content": [{"type": "text", "text": "last"}, image]},
+        ]
+
+        result = hook(messages)
+
+        first_types = [b["type"] for b in result[0]["content"]]
+        last_types = [b["type"] for b in result[-1]["content"]]
+        assert "image_url" not in first_types
+        assert "text" in first_types
+        assert "image_url" in last_types
+
+    def test_prune_stale_user_images_hook_leaves_assistant_messages_untouched(self):
+        canvas = Canvas()
+        image = canvas.to_image_content()
+        hook = create_prune_stale_user_images_hook()
+        assistant_msg = {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "reply"}, image],
+        }
+
+        result = hook([assistant_msg])
+
+        assert result == [assistant_msg]
+
+    def test_prune_stale_user_images_hook_leaves_tool_messages_unchanged(self):
+        hook = create_prune_stale_user_images_hook()
+        tool_msg = {"role": "tool", "content": "draw result", "tool_call_id": "abc"}
+
+        result = hook([tool_msg])
+
+        assert result == [tool_msg]
+
+    def test_prune_stale_user_images_hook_does_not_mutate_input(self):
+        canvas = Canvas()
+        image = canvas.to_image_content()
+        hook = create_prune_stale_user_images_hook()
+        messages = [
+            {"role": "user", "content": [{"type": "text", "text": "a"}, image]},
+            {"role": "user", "content": [{"type": "text", "text": "b"}, image]},
+        ]
+        original = copy.deepcopy(messages)
+
+        hook(messages)
+
+        assert messages == original
