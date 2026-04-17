@@ -69,12 +69,14 @@ def setup_pipeline(
 
     painter.register_nested_chats(
         trigger=critic,
-        chat_queue=[{
-            "recipient": painter_executor,
-            "sender": painter,
-            "max_turns": MAX_TOOL_ITERATIONS,
-            "summary_method": "last_msg",
-        }],
+        chat_queue=[
+            {
+                "recipient": painter_executor,
+                "sender": painter,
+                "max_turns": MAX_TOOL_ITERATIONS,
+                "summary_method": "last_msg",
+            }
+        ],
     )
 
     tracker = RoundTracker()
@@ -88,8 +90,17 @@ def setup_pipeline(
         "process_message_before_send", create_save_hook(canvas, tracker, output_dir)
     )
 
-    # Terminate after target rounds (checked on Painter's replies by initiate_chat)
-    painter._is_termination_msg = lambda msg: tracker.current_round > rounds
+    # Terminate after target rounds (checked on Painter's replies in Phase 2).
+    # In Phase 1, executor's loop checks this on Painter's replies: terminate when
+    # Painter produces non-empty text content (tool_call replies have content=None
+    # and should not terminate; a final text summary should).
+    painter._is_termination_msg = lambda msg: (
+        tracker.current_round > rounds
+        or (
+            msg.get("content") is not None
+            and str(msg.get("content", "")).strip() not in ("TERMINATE", "")
+        )
+    )
 
     return painter, painter_executor, critic, canvas, tools, tracker
 
@@ -104,9 +115,21 @@ def run_pipeline(
     painter, painter_executor, critic, canvas, tools, tracker = setup_pipeline(
         prompt, rounds, output_dir, painter_model, critic_model
     )
-    # Upper bound: 4 turns per round (tool call + tool result + text + feedback)
-    result = critic.initiate_chat(
-        painter, message=f"Please draw: {prompt}", max_turns=rounds * 4
+
+    # Phase 1: pre-draw. Executor kicks off Painter's LLM↔tool loop to produce first attempt.
+    painter_executor.initiate_chat(
+        painter,
+        message=f"Paint: {prompt}",
+        max_turns=MAX_TOOL_ITERATIONS,
+        clear_history=True,
+    )
+
+    # Phase 2: critique loop. Painter initiates with Critic.
+    # max_turns = rounds * 2 → `rounds` painter sends + `rounds` critic replies.
+    result = painter.initiate_chat(
+        critic,
+        message=f"I have painted: {prompt}. Please review.",
+        max_turns=rounds * 2,
     )
     return result
 
