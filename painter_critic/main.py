@@ -90,11 +90,6 @@ def setup_pipeline(
         "process_message_before_send", create_save_hook(canvas, tracker, output_dir)
     )
 
-    # Terminate Phase 2 after target rounds. Phase 1 relies on max_turns.
-    # Content must not trigger termination — Phase 1's initial "Paint: X" message
-    # has non-empty content and must not kill the loop before Painter draws.
-    painter._is_termination_msg = lambda msg: tracker.current_round > rounds
-
     return painter, painter_executor, critic, canvas, tools, tracker
 
 

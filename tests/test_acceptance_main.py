@@ -132,27 +132,6 @@ class TestArchitectureAcceptance:
 
         assert set(painter_executor.function_map.keys()) == set(tools.keys())
 
-    def test_setup_pipeline_termination_ignores_non_empty_content(
-        self, tmp_output_dir, api_url_env
-    ):
-        """Termination must be driven by round count only, not message content.
-
-        Bug: _is_termination_msg fired on any non-empty content, killing Phase 1
-        (on 'Paint: X' arriving) and Phase 2 (on Critic feedback arriving).
-        """
-        painter, _, _, _, _, tracker = setup_pipeline(
-            "x", rounds=2, output_dir=str(tmp_output_dir)
-        )
-
-        # Critic feedback while still within target rounds must NOT terminate
-        assert not painter._is_termination_msg(
-            {"content": "Add more red to the painting."}
-        )
-
-        # After exceeding target rounds — must terminate regardless of content
-        tracker.increment()  # round 2
-        tracker.increment()  # round 3 > rounds=2
-        assert painter._is_termination_msg({"content": "Looks good!"})
 
 
 class TestPipelineAcceptance:
