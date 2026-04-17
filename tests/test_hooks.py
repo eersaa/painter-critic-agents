@@ -618,7 +618,7 @@ class TestPruneStaleUserImagesHookUnit:
 
         assert callable(hook)
 
-    def test_prune_stale_user_images_hook_keeps_image_on_only_last_user_message(self):
+    def test_prune_stale_user_images_hook_strips_from_all_user_messages(self):
         canvas = Canvas()
         image = canvas.to_image_content()
         hook = create_prune_stale_user_images_hook()
@@ -629,11 +629,10 @@ class TestPruneStaleUserImagesHookUnit:
 
         result = hook(messages)
 
-        first_types = [b["type"] for b in result[0]["content"]]
-        last_types = [b["type"] for b in result[-1]["content"]]
-        assert "image_url" not in first_types
-        assert "text" in first_types
-        assert "image_url" in last_types
+        for msg in result:
+            types = [b["type"] for b in msg["content"]]
+            assert "image_url" not in types
+            assert "text" in types
 
     def test_prune_stale_user_images_hook_leaves_assistant_messages_untouched(self):
         canvas = Canvas()
