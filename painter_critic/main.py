@@ -24,12 +24,12 @@ from painter_critic.hooks import (
 from painter_critic.tools import create_tools
 
 
-def save_conversation_log(chat_history: list[dict], output_dir: str) -> None:
+def save_conversation_log(chat_history: list[dict], output_dir: str, prompt: str) -> None:
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     log_path = out / "conversation.log"
 
-    lines = []
+    lines = [f"--- User ---\nPaint: {prompt}\n\n"]
     for msg in chat_history:
         name = msg.get("name", "Unknown")
         content = msg.get("content")
@@ -160,4 +160,4 @@ def main(argv: list[str] | None = None) -> None:
     result = run_pipeline(
         args.prompt, args.rounds, OUTPUT_DIR, args.painter_model, args.critic_model
     )
-    save_conversation_log(result.chat_history, OUTPUT_DIR)
+    save_conversation_log(result.chat_history, OUTPUT_DIR, args.prompt)
